@@ -1,5 +1,0 @@
-package alg
-
-func main() {
-
-}
