@@ -5,5 +5,8 @@ import (
 )
 
 func main() {
-	alg.TwoArrayInterSectionTest()
+	//alg.TwoArrayInterSectionTest()
+
+	alg.TestLongestSamePrefix()
+
 }
