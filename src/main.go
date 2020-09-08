@@ -1,12 +1,12 @@
 package main
 
-import (
-	"alg"
-)
+import "alg"
 
 func main() {
 	//alg.TwoArrayInterSectionTest()
 
-	alg.TestLongestSamePrefix()
+	//alg.TestLongestSamePrefix()
+
+	alg.TestTheBestTimeForStocks()
 
 }
