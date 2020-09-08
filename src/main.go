@@ -7,6 +7,8 @@ func main() {
 
 	//alg.TestLongestSamePrefix()
 
-	alg.TestTheBestTimeForStocks()
+	//alg.TestTheBestTimeForStocks()
+
+	alg.TestRotateArray()
 
 }

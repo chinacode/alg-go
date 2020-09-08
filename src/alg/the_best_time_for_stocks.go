@@ -45,7 +45,7 @@ func theBestTimeForStocks(tmpList []int) int {
 
 func TestTheBestTimeForStocks() {
 	tmpList := []int{
-		//7, 1, 5, 3, 2, 4,
+		7, 1, 5, 3, 2, 4,
 		//7, 6, 4, 3, 1,
 		1, 2, 3, 4, 5,
 	}
