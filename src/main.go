@@ -13,6 +13,8 @@ func main() {
 
 	//alg.TestRemoveArray()
 
-	alg.TestAddOneArray()
+	//alg.TestAddOneArray()
+
+	alg.TestGetSumArray()
 
 }
