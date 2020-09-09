@@ -25,16 +25,27 @@ func getThreeSumArray(tmpList []int) [][]int {
 	sort.Ints(tmpList)
 	listLen := len(tmpList)
 	for i, v := range tmpList {
-		j := i + 1
-		k := listLen - 1
+		if v > 0 {
+			break
+		}
+		l := i + 1
+		r := listLen - 1
 
-		for v+tmpList[k] > 0 {
-			k--
+		for l < r {
+			if v+tmpList[l]+tmpList[r] == 0 {
+				for v+tmpList[l]+tmpList[r] < 0 {
+					r++
+				}
+			} else if v+tmpList[l]+tmpList[r] < 0 {
+				for v+tmpList[l]+tmpList[r] > 0 {
+					r++
+				}
+			} else {
+
+			}
 		}
 
-		for v+tmpList[j] > 0 {
-			j++
-		}
+		newList = append(newList, []int{v, tmpList[l], tmpList[r]})
 	}
 
 	return newList
