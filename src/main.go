@@ -15,6 +15,7 @@ func main() {
 
 	//alg.TestAddOneArray()
 
-	alg.TestGetSumArray()
+	//alg.TestGetSumArray()
 
+	alg.TestGetThreeSumArray()
 }
