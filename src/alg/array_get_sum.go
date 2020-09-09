@@ -5,20 +5,33 @@ import (
 	"util"
 )
 
+func getSumArray2(nums []int, target int) []int {
+	result := []int{}
+	m := make(map[int]int)
+	for i, k := range nums {
+		if value, exist := m[target-k]; exist {
+			result = append(result, value)
+			result = append(result, i)
+		}
+		m[k] = i
+	}
+	return result
+}
+
 func getSumArray(tmpList []int, sum int) []int {
 	newList := []int{0, 0}
 	valIndexMap := map[int]int{}
 
-	for i := 0; i < len(tmpList); i++ {
-		valIndexMap[tmpList[i]] = i
-	}
+	//for i := 0; i < len(tmpList); i++ {
+	//	valIndexMap[tmpList[i]] = i
+	//}
 
-	for _, v := range tmpList {
-		diff := sum - v
-		if valIndexMap[diff] != 0 {
-			newList = []int{valIndexMap[v], valIndexMap[diff]}
-			break
+	for i, v := range tmpList {
+		value, exists := valIndexMap[sum-v]
+		if exists {
+			newList = []int{i, value}
 		}
+		valIndexMap[v] = i
 	}
 
 	return newList
@@ -32,9 +45,9 @@ func TestGetSumArray() {
 	}
 
 	var resultData []int
-	sum := 5
+	sum := 7
 	loopCount := 1
-	loopCount = 10000000
+	loopCount = 3000000
 	util.Start("first", "")
 	for i := 0; i < loopCount; i++ {
 		resultData = getSumArray(tmpList, sum)
@@ -44,7 +57,7 @@ func TestGetSumArray() {
 
 	util.Start("second", "")
 	for i := 0; i < loopCount; i++ {
-		//resultData = getSumArray2(tmpList)
+		resultData = getSumArray2(tmpList, sum)
 	}
 	fmt.Println(resultData)
 	util.Cut("second", "")
