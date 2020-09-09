@@ -2,6 +2,7 @@ package alg
 
 import (
 	"fmt"
+	"sort"
 	"util"
 )
 
@@ -18,39 +19,41 @@ func getThreeSumArray2(nums []int, target int) []int {
 	return result
 }
 
-func getThreeSumArray(tmpList []int, threeSum int) [][]int {
+func getThreeSumArray(tmpList []int) [][]int {
 	var newList [][]int
-	//valIndexMap := map[int]int{}
 
-	//for i := 0; i < len(tmpList); i++ {
-	//	//	valIndexMap[tmpList[i]] = i
-	//	//}
+	sort.Ints(tmpList)
+	listLen := len(tmpList)
+	for i, v := range tmpList {
+		j := i + 1
+		k := listLen - 1
 
-	//for i, v := range tmpList {
-	//	value, exists := valIndexMap[threeSum-v]
-	//	if exists {
-	//		newList = []int{i, value}
-	//	}
-	//	valIndexMap[v] = i
-	//}
+		for v+tmpList[k] > 0 {
+			k--
+		}
+
+		for v+tmpList[j] > 0 {
+			j++
+		}
+	}
 
 	return newList
 }
 
 func TestGetThreeSumArray() {
 	tmpList := []int{
-		1, 2, 6, 3,
+		-1, 0, 1, 2, -1, -4,
 		//7, 6, 4, 3, 1,
 		//1, 2, 3, 4, 5,
 	}
 
 	var resultData [][]int
-	ThreeSum := 7
+	//ThreeSum := 0
 	loopCount := 1
-	loopCount = 3000000
+	//loopCount = 3000000
 	util.Start("first", "")
 	for i := 0; i < loopCount; i++ {
-		resultData = getThreeSumArray(tmpList, ThreeSum)
+		resultData = getThreeSumArray(tmpList)
 	}
 	fmt.Println(resultData)
 	util.Cut("first", "")
