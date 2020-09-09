@@ -5,9 +5,10 @@ import (
 	"util"
 )
 
-func rotateArray2(nums []int, k int) []int {
-	newList := make([]int, len(nums))
-	copy(newList, nums)
+func rotateArray2(tmpList []int, k int) []int {
+	listLength := len(tmpList)
+	newList := make([]int, listLength)
+	copy(newList, tmpList)
 	reverse(newList)
 	reverse(newList[:k%len(newList)])
 	reverse(newList[k%len(newList):])
@@ -21,14 +22,16 @@ func reverse(arr []int) {
 }
 
 func rotateArray3(tmpList []int, k int) []int {
-	if len(tmpList) <= 1 {
+	listLength := len(tmpList)
+	if listLength <= 1 {
 		return tmpList
 	}
 
-	listLength := len(tmpList)
 	newList := make([]int, listLength)
+	//newList := tmpList[0:]
 	for i := 0; i < listLength; i++ {
-
+		index := (i + k) % listLength
+		newList[index] = tmpList[i]
 	}
 	return newList
 }
@@ -62,7 +65,7 @@ func TestRotateArray() {
 	var resultData []int
 	rotateK := 3
 	loopCount := 1
-	loopCount = 5000000
+	loopCount = 10000000
 	util.Start("first", "")
 	for i := 0; i < loopCount; i++ {
 		resultData = rotateArray(tmpList, rotateK)
@@ -76,5 +79,12 @@ func TestRotateArray() {
 	}
 	fmt.Println(resultData)
 	util.Cut("second", "")
+
+	util.Start("third", "")
+	for i := 0; i < loopCount; i++ {
+		resultData = rotateArray3(tmpList, rotateK)
+	}
+	fmt.Println(resultData)
+	util.Cut("third", "")
 
 }

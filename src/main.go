@@ -9,6 +9,10 @@ func main() {
 
 	//alg.TestTheBestTimeForStocks()
 
-	alg.TestRotateArray()
+	//alg.TestRotateArray()
+
+	//alg.TestRemoveArray()
+
+	alg.TestAddOneArray()
 
 }
