@@ -31,20 +31,25 @@ func getThreeSumArray(tmpList []int) [][]int {
 		l := i + 1
 		r := listLen - 1
 
-		for l < r {
-			if v+tmpList[l]+tmpList[r] == 0 {
-				for v+tmpList[l]+tmpList[r] < 0 {
-					r++
+		if v+tmpList[l]+tmpList[r] > 0 {
+			for v+tmpList[l]+tmpList[r] > 0 {
+				r--
+				if l >= r {
+					break
 				}
-			} else if v+tmpList[l]+tmpList[r] < 0 {
-				for v+tmpList[l]+tmpList[r] > 0 {
-					r++
+			}
+		} else if v+tmpList[l]+tmpList[r] < 0 {
+			for v+tmpList[l]+tmpList[r] < 0 {
+				l++
+				if l >= r {
+					break
 				}
-			} else {
-
 			}
 		}
 
+		if l >= r {
+			continue
+		}
 		newList = append(newList, []int{v, tmpList[l], tmpList[r]})
 	}
 
@@ -53,7 +58,7 @@ func getThreeSumArray(tmpList []int) [][]int {
 
 func TestGetThreeSumArray() {
 	tmpList := []int{
-		-1, 0, 1, 2, -1, -4,
+		-1, 0, 1, 2, -1, 3, -4,
 		//7, 6, 4, 3, 1,
 		//1, 2, 3, 4, 5,
 	}
@@ -61,7 +66,7 @@ func TestGetThreeSumArray() {
 	var resultData [][]int
 	//ThreeSum := 0
 	loopCount := 1
-	//loopCount = 3000000
+	loopCount = 3000000
 	util.Start("first", "")
 	for i := 0; i < loopCount; i++ {
 		resultData = getThreeSumArray(tmpList)
