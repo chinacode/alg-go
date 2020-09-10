@@ -31,22 +31,16 @@ func getThreeSumArray(tmpList []int) [][]int {
 		l := i + 1
 		r := listLen - 1
 
-		if v+tmpList[l]+tmpList[r] > 0 {
+		sum := v + tmpList[l] + tmpList[r]
+		if sum > 0 {
 			for v+tmpList[l]+tmpList[r] > 0 {
 				r--
-				if l >= r {
-					break
-				}
 			}
-		} else if v+tmpList[l]+tmpList[r] < 0 {
+		} else if sum < 0 {
 			for v+tmpList[l]+tmpList[r] < 0 {
 				l++
-				if l >= r {
-					break
-				}
 			}
 		}
-
 		if l >= r {
 			continue
 		}
