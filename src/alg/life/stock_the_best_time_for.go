@@ -1,4 +1,4 @@
-package alg
+package life
 
 import (
 	"fmt"

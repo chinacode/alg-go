@@ -1,21 +1,23 @@
 package main
 
-import "alg"
+import (
+	"alg/string"
+)
 
 func main() {
-	//alg.TwoArrayInterSectionTest()
+	//------------------array---------------------//
+	//array.TwoArrayInterSectionTest()
+	//array.TestRotateArray()
+	//array.TestRemoveArray()
+	//array.TestAddOneArray()
+	//array.TestGetSumArray()
+	//array.TestGetThreeSumArray()
 
-	//alg.TestLongestSamePrefix()
+	//------------------string---------------------//
+	//string.TestLongestSamePrefix()
+	string.TestGetStringZChange()
 
-	//alg.TestTheBestTimeForStocks()
+	//------------------life---------------------//
+	//life.TestTheBestTimeForStocks()
 
-	//alg.TestRotateArray()
-
-	//alg.TestRemoveArray()
-
-	//alg.TestAddOneArray()
-
-	//alg.TestGetSumArray()
-
-	alg.TestGetThreeSumArray()
 }

@@ -1,4 +1,4 @@
-package alg
+package array
 
 import (
 	"fmt"
@@ -21,7 +21,6 @@ func getThreeSumArray2(nums []int, target int) []int {
 
 func getThreeSumArray(tmpList []int) [][]int {
 	var newList [][]int
-
 	sort.Ints(tmpList)
 	listLen := len(tmpList)
 	for i, v := range tmpList {

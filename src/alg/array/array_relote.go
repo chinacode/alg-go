@@ -1,4 +1,4 @@
-package alg
+package array
 
 import (
 	"fmt"

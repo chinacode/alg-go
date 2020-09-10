@@ -1,4 +1,4 @@
-package alg
+package string
 
 import (
 	"fmt"
