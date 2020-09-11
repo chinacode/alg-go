@@ -1,8 +1,6 @@
 package main
 
-import (
-	"alg/string"
-)
+import "alg/linked"
 
 func main() {
 	//------------------array---------------------//
@@ -15,7 +13,10 @@ func main() {
 
 	//------------------string---------------------//
 	//string.TestLongestSamePrefix()
-	string.TestGetStringZChange()
+	//string.TestGetStringZChange()
+
+	//------------------list---------------------//
+	linked.TestDeleteLinkedReciprocalNode()
 
 	//------------------life---------------------//
 	//life.TestTheBestTimeForStocks()
