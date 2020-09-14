@@ -21,22 +21,12 @@ func MergeSortList(node1 *ListNode, node2 *ListNode) *ListNode {
 		if i == 9 {
 			println(i)
 		}
-		if nil != node1 && nil != node2 {
-			if node1.Val <= node2.Val {
-				tmpNode = node1
-				node1 = node1.Next
-			} else {
-				tmpNode = node2
-				node2 = node2.Next
-			}
+		if nil == node2 || node1.Val <= node2.Val {
+			tmpNode = node1
+			node1 = node1.Next
 		} else {
-			if nil == node1 {
-				tmpNode = node2
-				node2 = node2.Next
-			} else {
-				tmpNode = node1
-				node1 = node1.Next
-			}
+			tmpNode = node2
+			node2 = node2.Next
 		}
 		if nil == result.Next {
 			result.Next = preNode
