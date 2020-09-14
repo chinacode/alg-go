@@ -5,11 +5,6 @@ import (
 	"util"
 )
 
-type ListNode struct {
-	Next *ListNode
-	Val  int
-}
-
 func deleteLinkedReciprocalNode2(head *ListNode, n int) *ListNode {
 	result := &ListNode{}
 	result.Next = head
@@ -55,44 +50,10 @@ func deleteLinkedReciprocalNode(tmpListNodes *ListNode, reciprocalN int) *ListNo
 	return result.Next
 }
 
-func reversePrint(head *ListNode) []int {
-	if head == nil {
-		return nil
-	}
-	var res []int
-	for head != nil {
-		res = append(res, head.Val)
-		head = head.Next
-	}
-
-	for i, j := 0, len(res)-1; i < j; {
-		res[i], res[j] = res[j], res[i]
-		i++
-		j--
-	}
-
-	return res
-}
-
-func initListNodes() *ListNode {
-	headNode := &ListNode{}
-	var preNode *ListNode
-	for i := 1; i <= 10; i++ {
-		curNote := ListNode{Val: i, Next: nil}
-		if i == 1 {
-			headNode = &curNote
-		} else {
-			preNode.Next = &curNote
-		}
-		preNode = &curNote
-	}
-	return headNode
-}
-
 /**
  */
 func TestDeleteLinkedReciprocalNode() {
-	headNode := initListNodes()
+	headNode := initListNodes(10)
 
 	var resultData *ListNode
 	reciprocalN := 1
@@ -102,15 +63,15 @@ func TestDeleteLinkedReciprocalNode() {
 	for i := 0; i < loopCount; i++ {
 		resultData = deleteLinkedReciprocalNode(headNode, reciprocalN)
 	}
-	fmt.Println(reversePrint(resultData))
+	fmt.Println(linkedListPrint(resultData))
 	util.Cut("first", "")
 
-	headNode = initListNodes()
+	headNode = initListNodes(10)
 	util.Start("second", "")
 	for i := 0; i < loopCount; i++ {
 		resultData = deleteLinkedReciprocalNode2(headNode, reciprocalN)
 	}
-	fmt.Println(reversePrint(resultData))
+	fmt.Println(linkedListPrint(resultData))
 	util.Cut("second", "")
 
 }

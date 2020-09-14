@@ -1,8 +1,13 @@
 package main
 
-import "alg/linked"
+import (
+	"alg/linked"
+	"math/rand"
+	"time"
+)
 
 func main() {
+	rand.Seed(time.Now().Unix())
 	//------------------array---------------------//
 	//array.TwoArrayInterSectionTest()
 	//array.TestRotateArray()
@@ -16,7 +21,8 @@ func main() {
 	//string.TestGetStringZChange()
 
 	//------------------list---------------------//
-	linked.TestDeleteLinkedReciprocalNode()
+	//linked.TestDeleteLinkedReciprocalNode()
+	linked.TestMergeSortList()
 
 	//------------------life---------------------//
 	//life.TestTheBestTimeForStocks()
