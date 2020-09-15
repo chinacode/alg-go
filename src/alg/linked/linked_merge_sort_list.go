@@ -16,36 +16,65 @@ func MergeSortList(node1 *ListNode, node2 *ListNode) *ListNode {
 	var preNode *ListNode
 	result := &ListNode{}
 
-	i := 0
 	for node1 != nil || node2 != nil {
-		if i == 9 {
-			println(i)
-		}
-		if nil == node2 || node1.Val <= node2.Val {
+		if nil == node1 {
+			tmpNode = node2
+			node2 = node2.Next
+		} else if nil == node2 {
+			tmpNode = node1
+			node1 = node1.Next
+		} else if node1.Val <= node2.Val {
 			tmpNode = node1
 			node1 = node1.Next
 		} else {
 			tmpNode = node2
 			node2 = node2.Next
 		}
+
 		if nil == result.Next {
-			result.Next = preNode
+			result.Next = tmpNode
 			preNode = tmpNode
 		} else {
 			preNode.Next = tmpNode
 			preNode = tmpNode
 		}
-		i++
 	}
 
 	return result.Next
 }
 
 /**
+有问题
+*/
+func MergeSortList2(l1 *ListNode, l2 *ListNode) *ListNode {
+	preHead := &ListNode{}
+	result := preHead
+	for l1 != nil && l2 != nil {
+		if l1.Val < l2.Val {
+			preHead.Next = l1
+			l1 = l1.Next
+		} else {
+			preHead.Next = l2
+			l2 = l2.Next
+		}
+		preHead = preHead.Next
+	}
+	if l1 != nil {
+		preHead.Next = l1
+	}
+	if l2 != nil {
+		preHead.Next = l2
+	}
+	return result.Next
+}
+
+/**
  */
 func TestMergeSortList() {
-	headNode1 := initListSortRandNodes(5)
-	headNode2 := initListSortRandNodes(5)
+	//headNode1 := changeList2ListNode([]int{18, 24, 33, 33, 40})
+	//headNode2 := changeList2ListNode([]int{11, 28, 34, 36, 38})
+	headNode1 := initListSortRandNodes(10)
+	headNode2 := initListSortRandNodes(10)
 	fmt.Println(linkedListPrint(headNode1), linkedListPrint(headNode2))
 
 	var resultData *ListNode
@@ -58,12 +87,11 @@ func TestMergeSortList() {
 	fmt.Println(linkedListPrint(resultData))
 	util.Cut("first", "")
 
-	//headNode = initListSortRandNodes(5)
-	//util.Start("second", "")
-	//for i := 0; i < loopCount; i++ {
-	//	//resultData = MergeSortList2(headNode, reciprocalN)
-	//}
-	//fmt.Println(linkedListPrint(resultData))
-	//util.Cut("second", "")
+	util.Start("second", "")
+	for i := 0; i < loopCount; i++ {
+		resultData = MergeSortList2(headNode1, headNode2)
+	}
+	fmt.Println(linkedListPrint(resultData))
+	util.Cut("second", "")
 
 }

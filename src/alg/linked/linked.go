@@ -70,6 +70,23 @@ func initListSortRandNodes(linkNum int) *ListNode {
 	return headNode
 }
 
+func changeList2ListNode(list []int) *ListNode {
+	headNode := &ListNode{}
+	var preNode *ListNode
+
+	for i, v := range list {
+		curNode := ListNode{Val: v, Next: nil}
+		if i == 0 {
+			headNode = &curNode
+		} else {
+			preNode.Next = &curNode
+		}
+		preNode = &curNode
+	}
+
+	return headNode
+}
+
 func linkedListPrint(head *ListNode) []int {
 	if head == nil {
 		return nil
