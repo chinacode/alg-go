@@ -22,7 +22,8 @@ func main() {
 
 	//------------------list---------------------//
 	//linked.TestDeleteLinkedReciprocalNode()
-	linked.TestMergeSortList()
+	//linked.TestMergeSortList()
+	linked.TestCheckLinkedRing()
 
 	//------------------life---------------------//
 	//life.TestTheBestTimeForStocks()

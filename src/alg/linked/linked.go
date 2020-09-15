@@ -70,6 +70,36 @@ func initListSortRandNodes(linkNum int) *ListNode {
 	return headNode
 }
 
+func initRandCycleLinkedList(linkNum int, pos int) *ListNode {
+	headNode := &ListNode{}
+	var preNode *ListNode
+	var posNode *ListNode
+
+	if linkNum < pos {
+		return headNode
+	}
+
+	for i := 1; i <= linkNum; i++ {
+		v := generateRangeNum(10, 50)
+
+		curNote := ListNode{Val: v, Next: nil}
+		if i == 1 {
+			headNode = &curNote
+		} else {
+			preNode.Next = &curNote
+		}
+
+		if i == pos {
+			posNode = &curNote
+		}
+		if i == linkNum {
+			curNote.Next = posNode
+		}
+		preNode = &curNote
+	}
+	return headNode
+}
+
 func changeList2ListNode(list []int) *ListNode {
 	headNode := &ListNode{}
 	var preNode *ListNode
