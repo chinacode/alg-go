@@ -31,11 +31,14 @@ func generateRangeNum(min, max int) int {
 	return randNum
 }
 
-func initListRandNodes(linkNum int) *ListNode {
+func initRangeLinkList(linkNum int, min int, max int) *ListNode {
 	headNode := &ListNode{}
+	if min >= max {
+		return headNode
+	}
 	var preNode *ListNode
 	for i := 1; i <= linkNum; i++ {
-		v := generateRangeNum(10, 50)
+		v := generateRangeNum(min, max)
 
 		curNote := ListNode{Val: v, Next: nil}
 		if i == 1 {
@@ -46,6 +49,10 @@ func initListRandNodes(linkNum int) *ListNode {
 		preNode = &curNote
 	}
 	return headNode
+}
+
+func initListRandNodes(linkNum int) *ListNode {
+	return initRangeLinkList(linkNum, 10, 50)
 }
 
 func initListSortRandNodes(linkNum int) *ListNode {

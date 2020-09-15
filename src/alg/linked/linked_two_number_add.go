@@ -8,80 +8,118 @@ import (
 /**
 通过双方不同不长进行处理
 */
-func linkedTwoNumberAdd(nodes *ListNode) bool {
-	tmpNode1 := nodes
-	tmpNode2 := nodes
-
-	for nil != tmpNode1 && nil != tmpNode1.Next && nil != tmpNode2 {
-		if tmpNode1 == tmpNode2 {
-			return true
+func linkedTwoNumberAdd(nodes1 *ListNode, nodes2 *ListNode) *ListNode {
+	var carry int
+	var preNode *ListNode
+	resultNodes := &ListNode{}
+	for nil != nodes1 && nil != nodes2 {
+		num := nodes1.Val + nodes2.Val + carry
+		if num >= 10 {
+			num = num - 10
+			carry = 1
+		} else {
+			carry = 0
 		}
-		tmpNode1 = tmpNode1.Next.Next
-		tmpNode2 = tmpNode2.Next
+
+		currentNode := &ListNode{Val: num, Next: nil}
+
+		if nil == resultNodes.Next {
+			resultNodes.Next = currentNode
+		} else {
+			preNode.Next = currentNode
+		}
+
+		preNode = currentNode
+
+		nodes1 = nodes1.Next
+		nodes2 = nodes2.Next
 	}
 
-	return false
+	var extra *ListNode
+	if nil != nodes1 {
+		extra = nodes1
+	}
+	if nil != nodes2 {
+		extra = nodes2
+	}
+	if carry == 0 {
+		preNode.Next = extra
+	} else {
+		for nil != extra {
+			num := extra.Val + carry
+			if num >= 10 {
+				num = num - 10
+				carry = 1
+			} else {
+				preNode.Next = extra
+				break
+			}
+			extra.Val = num
+
+			preNode.Next = extra
+			preNode = extra
+
+			extra = extra.Next
+		}
+	}
+
+	return resultNodes.Next
 }
 
 /**
  */
-func linkedTwoNumberAdd2(nodes *ListNode) bool {
-	if nodes == nil {
-		return false
-	}
-	fast := nodes.Next // 快指针，每次走两步
-	for fast != nil && nodes != nil && fast.Next != nil {
-		if fast == nodes { // 快慢指针相遇，表示有环
-			return true
+func linkedTwoNumberAdd2(l1 *ListNode, l2 *ListNode) *ListNode {
+	list := &ListNode{Val: 0, Next: nil}
+	//这里用一个result，只是为了后面返回节点方便，并无他用
+	result := list
+	tmp := 0
+	for l1 != nil || l2 != nil || tmp != 0 {
+		if l1 != nil {
+			tmp += l1.Val
+			l1 = l1.Next
 		}
-		fast = fast.Next.Next
-		nodes = nodes.Next // 慢指针，每次走一步
-	}
-	return false
-}
-
-/**
-基础简单用法
-*/
-func linkedTwoNumberAdd3(head *ListNode) bool {
-	m := make(map[*ListNode]int)
-	for head != nil {
-		if _, exist := m[head]; exist {
-			return true
+		if l2 != nil {
+			tmp += l2.Val
+			l2 = l2.Next
 		}
-		m[head] = 1
-		head = head.Next
+		list.Next = &ListNode{nil, tmp % 10}
+		tmp = tmp / 10
+		list = list.Next
 	}
-	return false
+	return result.Next
 }
 
 /**
  */
 func TestLinkedTwoNumberAdd() {
-	headNodes := initRandCycleLinkedList(5, 2)
+	headNodes1 := initRangeLinkList(5, 0, 9)
+	headNodes2 := initRangeLinkList(10, 0, 9)
 
-	var resultData bool
+	fmt.Println(linkedListPrint(headNodes1))
+	fmt.Println(linkedListPrint(headNodes2))
+
+	var resultData *ListNode
 	loopCount := 1
-	loopCount = 5000000
+	loopCount = 10000000
 	util.Start("first", "")
 	for i := 0; i < loopCount; i++ {
-		resultData = linkedTwoNumberAdd(headNodes)
+		resultData = linkedTwoNumberAdd(headNodes1, headNodes2)
 	}
-	fmt.Println(resultData)
+	fmt.Println(linkedListPrint(resultData))
 	util.Cut("first", "")
 
 	util.Start("second", "")
 	for i := 0; i < loopCount; i++ {
-		resultData = linkedTwoNumberAdd2(headNodes)
+		resultData = linkedTwoNumberAdd2(headNodes1, headNodes2)
 	}
-	fmt.Println(resultData)
+	fmt.Println(linkedListPrint(resultData))
 	util.Cut("second", "")
 
-	util.Start("third", "")
-	for i := 0; i < loopCount; i++ {
-		resultData = linkedTwoNumberAdd3(headNodes)
-	}
-	fmt.Println(resultData)
-	util.Cut("third", "")
+	//util.Start("third", "")
+	//for i := 0; i < loopCount; i++ {
+	//	resultData = linkedTwoNumberAdd3(headNodes)
+	//}
+	//fmt.Println(resultData)
+	//util.Cut("third", "")
 
 }
