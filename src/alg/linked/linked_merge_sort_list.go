@@ -44,7 +44,7 @@ func MergeSortList(node1 *ListNode, node2 *ListNode) *ListNode {
 }
 
 /**
-有问题
+先比较小的排序，后面看剩余部分直接连接即可
 */
 func MergeSortList2(l1 *ListNode, l2 *ListNode) *ListNode {
 	preHead := &ListNode{}
@@ -80,12 +80,12 @@ func TestMergeSortList() {
 	var resultData *ListNode
 	loopCount := 1
 	//loopCount = 200000
-	util.Start("first", "")
-	for i := 0; i < loopCount; i++ {
-		resultData = MergeSortList(headNode1, headNode2)
-	}
-	fmt.Println(linkedListPrint(resultData))
-	util.Cut("first", "")
+	//util.Start("first", "")
+	//for i := 0; i < loopCount; i++ {
+	//	resultData = MergeSortList(headNode1, headNode2)
+	//}
+	//fmt.Println(linkedListPrint(resultData))
+	//util.Cut("first", "")
 
 	util.Start("second", "")
 	for i := 0; i < loopCount; i++ {
