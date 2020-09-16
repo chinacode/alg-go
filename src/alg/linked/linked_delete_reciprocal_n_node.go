@@ -53,7 +53,7 @@ func deleteLinkedReciprocalNode(tmpListNodes *ListNode, reciprocalN int) *ListNo
 /**
  */
 func TestDeleteLinkedReciprocalNode() {
-	headNode := initListNodes(10)
+	headNode := util.InitListNodes(10)
 
 	var resultData *ListNode
 	reciprocalN := 1
@@ -63,15 +63,15 @@ func TestDeleteLinkedReciprocalNode() {
 	for i := 0; i < loopCount; i++ {
 		resultData = deleteLinkedReciprocalNode(headNode, reciprocalN)
 	}
-	fmt.Println(linkedListPrint(resultData))
+	fmt.Println(util.LinkedListPrint(resultData))
 	util.Cut("first", "")
 
-	headNode = initListNodes(10)
+	headNode = util.InitListNodes(10)
 	util.Start("second", "")
 	for i := 0; i < loopCount; i++ {
 		resultData = deleteLinkedReciprocalNode2(headNode, reciprocalN)
 	}
-	fmt.Println(linkedListPrint(resultData))
+	fmt.Println(util.LinkedListPrint(resultData))
 	util.Cut("second", "")
 
 }

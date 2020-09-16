@@ -73,9 +73,9 @@ func MergeSortList2(l1 *ListNode, l2 *ListNode) *ListNode {
 func TestMergeSortList() {
 	//headNode1 := changeList2ListNode([]int{18, 24, 33, 33, 40})
 	//headNode2 := changeList2ListNode([]int{11, 28, 34, 36, 38})
-	headNode1 := initListSortRandNodes(10)
-	headNode2 := initListSortRandNodes(10)
-	fmt.Println(linkedListPrint(headNode1), linkedListPrint(headNode2))
+	headNode1 := util.InitListSortRandNodes(10)
+	headNode2 := util.InitListSortRandNodes(10)
+	fmt.Println(util.LinkedListPrint(headNode1), util.LinkedListPrint(headNode2))
 
 	var resultData *ListNode
 	loopCount := 1
@@ -91,7 +91,7 @@ func TestMergeSortList() {
 	for i := 0; i < loopCount; i++ {
 		resultData = MergeSortList2(headNode1, headNode2)
 	}
-	fmt.Println(linkedListPrint(resultData))
+	fmt.Println(util.LinkedListPrint(resultData))
 	util.Cut("second", "")
 
 }

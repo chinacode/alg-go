@@ -92,11 +92,11 @@ func linkedTwoNumberAdd2(l1 *ListNode, l2 *ListNode) *ListNode {
 /**
  */
 func TestLinkedTwoNumberAdd() {
-	headNodes1 := initRangeLinkList(5, 0, 9)
-	headNodes2 := initRangeLinkList(10, 0, 9)
+	headNodes1 := util.InitRangeLinkList(5, 0, 9)
+	headNodes2 := util.InitRangeLinkList(10, 0, 9)
 
-	fmt.Println(linkedListPrint(headNodes1))
-	fmt.Println(linkedListPrint(headNodes2))
+	fmt.Println(util.LinkedListPrint(headNodes1))
+	fmt.Println(util.LinkedListPrint(headNodes2))
 
 	var resultData *ListNode
 	loopCount := 1
@@ -105,14 +105,14 @@ func TestLinkedTwoNumberAdd() {
 	for i := 0; i < loopCount; i++ {
 		resultData = linkedTwoNumberAdd(headNodes1, headNodes2)
 	}
-	fmt.Println(linkedListPrint(resultData))
+	fmt.Println(util.LinkedListPrint(resultData))
 	util.Cut("first", "")
 
 	util.Start("second", "")
 	for i := 0; i < loopCount; i++ {
 		resultData = linkedTwoNumberAdd2(headNodes1, headNodes2)
 	}
-	fmt.Println(linkedListPrint(resultData))
+	fmt.Println(util.LinkedListPrint(resultData))
 	util.Cut("second", "")
 
 	//util.Start("third", "")

@@ -58,7 +58,7 @@ func CheckLinkedCycle3(head *ListNode) bool {
 /**
  */
 func TestCheckLinkedRing() {
-	headNodes := initRandCycleLinkedList(5, 2)
+	headNodes := util.InitRandCycleLinkedList(5, 2)
 
 	var resultData bool
 	loopCount := 1

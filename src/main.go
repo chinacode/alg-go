@@ -1,7 +1,7 @@
 package main
 
 import (
-	"alg/linked"
+	"alg/dynamic"
 	"math/rand"
 	"time"
 )
@@ -24,9 +24,13 @@ func main() {
 	//linked.TestDeleteLinkedReciprocalNode()
 	//linked.TestMergeSortList()
 	//linked.TestCheckLinkedRing()
-	linked.TestLinkedTwoNumberAdd()
+	//linked.TestLinkedTwoNumberAdd()
 
 	//------------------life---------------------//
 	//life.TestTheBestTimeForStocks()
+
+	//------------------dynamic programming---------------------//
+	//dynamic.TestClimbStairs()
+	dynamic.TestArrayMaxSubArray()
 
 }
