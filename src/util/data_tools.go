@@ -1,16 +1,16 @@
 package util
 
 import (
-	"alg/linked"
+	"config"
 	"math/rand"
 	"sort"
 )
 
-func InitListNodes(linkNum int) *linked.ListNode {
-	headNode := &linked.ListNode{}
-	var preNode *linked.ListNode
+func InitListNodes(linkNum int) *config.ListNode {
+	headNode := &config.ListNode{}
+	var preNode *config.ListNode
 	for i := 1; i <= linkNum; i++ {
-		curNote := linked.ListNode{Val: i, Next: nil}
+		curNote := config.ListNode{Val: i, Next: nil}
 		if i == 1 {
 			headNode = &curNote
 		} else {
@@ -27,16 +27,16 @@ func GenerateRangeNum(min, max int) int {
 	return randNum
 }
 
-func InitRangeLinkList(linkNum int, min int, max int) *linked.ListNode {
-	headNode := &linked.ListNode{}
+func InitRangeLinkList(linkNum int, min int, max int) *config.ListNode {
+	headNode := &config.ListNode{}
 	if min >= max {
 		return headNode
 	}
-	var preNode *linked.ListNode
+	var preNode *config.ListNode
 	for i := 1; i <= linkNum; i++ {
 		v := GenerateRangeNum(min, max)
 
-		curNote := linked.ListNode{Val: v, Next: nil}
+		curNote := config.ListNode{Val: v, Next: nil}
 		if i == 1 {
 			headNode = &curNote
 		} else {
@@ -47,13 +47,13 @@ func InitRangeLinkList(linkNum int, min int, max int) *linked.ListNode {
 	return headNode
 }
 
-func InitListRandNodes(linkNum int) *linked.ListNode {
+func InitListRandNodes(linkNum int) *config.ListNode {
 	return InitRangeLinkList(linkNum, 10, 50)
 }
 
-func InitListSortRandNodes(linkNum int) *linked.ListNode {
-	headNode := &linked.ListNode{}
-	var preNode *linked.ListNode
+func InitListSortRandNodes(linkNum int) *config.ListNode {
+	headNode := &config.ListNode{}
+	var preNode *config.ListNode
 
 	list := make([]int, linkNum)
 	for i := 0; i < linkNum; i++ {
@@ -62,7 +62,7 @@ func InitListSortRandNodes(linkNum int) *linked.ListNode {
 	}
 	sort.Ints(list)
 	for i, v := range list {
-		curNote := linked.ListNode{Val: v, Next: nil}
+		curNote := config.ListNode{Val: v, Next: nil}
 		if i == 0 {
 			headNode = &curNote
 		} else {
@@ -73,10 +73,10 @@ func InitListSortRandNodes(linkNum int) *linked.ListNode {
 	return headNode
 }
 
-func InitRandCycleLinkedList(linkNum int, pos int) *linked.ListNode {
-	headNode := &linked.ListNode{}
-	var preNode *linked.ListNode
-	var posNode *linked.ListNode
+func InitRandCycleLinkedList(linkNum int, pos int) *config.ListNode {
+	headNode := &config.ListNode{}
+	var preNode *config.ListNode
+	var posNode *config.ListNode
 
 	if linkNum < pos {
 		return headNode
@@ -85,7 +85,7 @@ func InitRandCycleLinkedList(linkNum int, pos int) *linked.ListNode {
 	for i := 1; i <= linkNum; i++ {
 		v := GenerateRangeNum(10, 50)
 
-		curNote := linked.ListNode{Val: v, Next: nil}
+		curNote := config.ListNode{Val: v, Next: nil}
 		if i == 1 {
 			headNode = &curNote
 		} else {
@@ -103,12 +103,12 @@ func InitRandCycleLinkedList(linkNum int, pos int) *linked.ListNode {
 	return headNode
 }
 
-func ChangeList2ListNode(list []int) *linked.ListNode {
-	headNode := &linked.ListNode{}
-	var preNode *linked.ListNode
+func ChangeList2ListNode(list []int) *config.ListNode {
+	headNode := &config.ListNode{}
+	var preNode *config.ListNode
 
 	for i, v := range list {
-		curNode := linked.ListNode{Val: v, Next: nil}
+		curNode := config.ListNode{Val: v, Next: nil}
 		if i == 0 {
 			headNode = &curNode
 		} else {
@@ -120,7 +120,7 @@ func ChangeList2ListNode(list []int) *linked.ListNode {
 	return headNode
 }
 
-func LinkedListPrint(head *linked.ListNode) []int {
+func LinkedListPrint(head *config.ListNode) []int {
 	if head == nil {
 		return nil
 	}

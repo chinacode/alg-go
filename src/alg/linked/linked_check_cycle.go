@@ -1,6 +1,7 @@
 package linked
 
 import (
+	"config"
 	"fmt"
 	"util"
 )
@@ -8,7 +9,7 @@ import (
 /**
 通过双方不同不长进行处理
 */
-func CheckLinkedCycle(nodes *ListNode) bool {
+func CheckLinkedCycle(nodes *config.ListNode) bool {
 	tmpNode1 := nodes
 	tmpNode2 := nodes
 
@@ -25,7 +26,7 @@ func CheckLinkedCycle(nodes *ListNode) bool {
 
 /**
  */
-func CheckLinkedCycle2(nodes *ListNode) bool {
+func CheckLinkedCycle2(nodes *config.ListNode) bool {
 	if nodes == nil {
 		return false
 	}
@@ -43,8 +44,8 @@ func CheckLinkedCycle2(nodes *ListNode) bool {
 /**
 基础简单用法
 */
-func CheckLinkedCycle3(head *ListNode) bool {
-	m := make(map[*ListNode]int)
+func CheckLinkedCycle3(head *config.ListNode) bool {
+	m := make(map[*config.ListNode]int)
 	for head != nil {
 		if _, exist := m[head]; exist {
 			return true

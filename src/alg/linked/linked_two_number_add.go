@@ -1,6 +1,7 @@
 package linked
 
 import (
+	"config"
 	"fmt"
 	"util"
 )
@@ -8,10 +9,10 @@ import (
 /**
 通过双方不同不长进行处理
 */
-func linkedTwoNumberAdd(nodes1 *ListNode, nodes2 *ListNode) *ListNode {
+func linkedTwoNumberAdd(nodes1 *config.ListNode, nodes2 *config.ListNode) *config.ListNode {
 	var carry int
-	var preNode *ListNode
-	resultNodes := &ListNode{}
+	var preNode *config.ListNode
+	resultNodes := &config.ListNode{}
 	for nil != nodes1 && nil != nodes2 {
 		num := nodes1.Val + nodes2.Val + carry
 		if num >= 10 {
@@ -21,7 +22,7 @@ func linkedTwoNumberAdd(nodes1 *ListNode, nodes2 *ListNode) *ListNode {
 			carry = 0
 		}
 
-		currentNode := &ListNode{Val: num, Next: nil}
+		currentNode := &config.ListNode{Val: num, Next: nil}
 
 		if nil == resultNodes.Next {
 			resultNodes.Next = currentNode
@@ -35,7 +36,7 @@ func linkedTwoNumberAdd(nodes1 *ListNode, nodes2 *ListNode) *ListNode {
 		nodes2 = nodes2.Next
 	}
 
-	var extra *ListNode
+	var extra *config.ListNode
 	if nil != nodes1 {
 		extra = nodes1
 	}
@@ -68,8 +69,8 @@ func linkedTwoNumberAdd(nodes1 *ListNode, nodes2 *ListNode) *ListNode {
 
 /**
  */
-func linkedTwoNumberAdd2(l1 *ListNode, l2 *ListNode) *ListNode {
-	list := &ListNode{Val: 0, Next: nil}
+func linkedTwoNumberAdd2(l1 *config.ListNode, l2 *config.ListNode) *config.ListNode {
+	list := &config.ListNode{Val: 0, Next: nil}
 	//这里用一个result，只是为了后面返回节点方便，并无他用
 	result := list
 	tmp := 0
@@ -82,7 +83,7 @@ func linkedTwoNumberAdd2(l1 *ListNode, l2 *ListNode) *ListNode {
 			tmp += l2.Val
 			l2 = l2.Next
 		}
-		list.Next = &ListNode{nil, tmp % 10}
+		list.Next = &config.ListNode{nil, tmp % 10}
 		tmp = tmp / 10
 		list = list.Next
 	}
@@ -98,7 +99,7 @@ func TestLinkedTwoNumberAdd() {
 	fmt.Println(util.LinkedListPrint(headNodes1))
 	fmt.Println(util.LinkedListPrint(headNodes2))
 
-	var resultData *ListNode
+	var resultData *config.ListNode
 	loopCount := 1
 	loopCount = 10000000
 	util.Start("first", "")

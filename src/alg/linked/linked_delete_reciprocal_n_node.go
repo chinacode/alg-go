@@ -1,14 +1,15 @@
 package linked
 
 import (
+	"config"
 	"fmt"
 	"util"
 )
 
-func deleteLinkedReciprocalNode2(head *ListNode, n int) *ListNode {
-	result := &ListNode{}
+func deleteLinkedReciprocalNode2(head *config.ListNode, n int) *config.ListNode {
+	result := &config.ListNode{}
 	result.Next = head
-	var pre *ListNode
+	var pre *config.ListNode
 	cur := result
 	i := 1
 	for head != nil {
@@ -27,11 +28,11 @@ func deleteLinkedReciprocalNode2(head *ListNode, n int) *ListNode {
 /**
  * 刪除链表倒数的数值 ， 两个数值的遍历（一个先开始，一个后开始）；另外就是两次遍历先计算结构后遍历判断
  */
-func deleteLinkedReciprocalNode(tmpListNodes *ListNode, reciprocalN int) *ListNode {
+func deleteLinkedReciprocalNode(tmpListNodes *config.ListNode, reciprocalN int) *config.ListNode {
 	index := 1
-	var preNode *ListNode
+	var preNode *config.ListNode
 
-	result := &ListNode{}
+	result := &config.ListNode{}
 	result.Next = tmpListNodes
 	curNode := result
 	for nil != tmpListNodes {
@@ -55,7 +56,7 @@ func deleteLinkedReciprocalNode(tmpListNodes *ListNode, reciprocalN int) *ListNo
 func TestDeleteLinkedReciprocalNode() {
 	headNode := util.InitListNodes(10)
 
-	var resultData *ListNode
+	var resultData *config.ListNode
 	reciprocalN := 1
 	loopCount := 1
 	//loopCount = 200000

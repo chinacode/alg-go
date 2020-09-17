@@ -1,6 +1,7 @@
 package linked
 
 import (
+	"config"
 	"fmt"
 	"util"
 )
@@ -8,13 +9,13 @@ import (
 /**
  * 刪除链表倒数的数值 ， 两个数值的遍历（一个先开始，一个后开始）；另外就是两次遍历先计算结构后遍历判断
  */
-func MergeSortList(node1 *ListNode, node2 *ListNode) *ListNode {
+func MergeSortList(node1 *config.ListNode, node2 *config.ListNode) *config.ListNode {
 	if node1.Next == nil && node2.Next == nil {
 		return nil
 	}
-	var tmpNode *ListNode
-	var preNode *ListNode
-	result := &ListNode{}
+	var tmpNode *config.ListNode
+	var preNode *config.ListNode
+	result := &config.ListNode{}
 
 	for node1 != nil || node2 != nil {
 		if nil == node1 {
@@ -46,8 +47,8 @@ func MergeSortList(node1 *ListNode, node2 *ListNode) *ListNode {
 /**
 先比较小的排序，后面看剩余部分直接连接即可
 */
-func MergeSortList2(l1 *ListNode, l2 *ListNode) *ListNode {
-	preHead := &ListNode{}
+func MergeSortList2(l1 *config.ListNode, l2 *config.ListNode) *config.ListNode {
+	preHead := &config.ListNode{}
 	result := preHead
 	for l1 != nil && l2 != nil {
 		if l1.Val < l2.Val {
@@ -77,7 +78,7 @@ func TestMergeSortList() {
 	headNode2 := util.InitListSortRandNodes(10)
 	fmt.Println(util.LinkedListPrint(headNode1), util.LinkedListPrint(headNode2))
 
-	var resultData *ListNode
+	var resultData *config.ListNode
 	loopCount := 1
 	//loopCount = 200000
 	//util.Start("first", "")
