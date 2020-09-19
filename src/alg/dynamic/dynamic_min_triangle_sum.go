@@ -18,8 +18,8 @@ func MinTriangleSum2(triangle [][]int) int {
 	}
 	result := 1<<31 - 1
 	dp[0][0] = triangle[0][0]
-	dp[1][1] = triangle[1][1] + triangle[0][0]
 	dp[1][0] = triangle[1][0] + triangle[0][0]
+	dp[1][1] = triangle[1][1] + triangle[0][0]
 
 	for i := 2; i < len(triangle); i++ {
 		for j := 0; j < len(triangle[i]); j++ {
@@ -32,6 +32,7 @@ func MinTriangleSum2(triangle [][]int) int {
 			}
 		}
 	}
+	//fmt.Println(dp)
 	for _, k := range dp[len(dp)-1] {
 		result = min(result, k)
 	}
@@ -48,7 +49,7 @@ func min(a, b int) int {
 /**
 求取最小值
 */
-func MinTriangleSum(longArr [][]int) int {
+func MinTriangleSum3(longArr [][]int) int {
 	if len(longArr) == 1 {
 		return longArr[0][0]
 	}
@@ -61,6 +62,44 @@ func MinTriangleSum(longArr [][]int) int {
 			}
 		}
 		sum += min
+	}
+	return sum
+}
+
+func MinTriangleSum(longArr [][]int) int {
+	level := len(longArr)
+	if level == 1 {
+		return longArr[0][0]
+	}
+
+	dp := make([][]int, level)
+	for i, arr := range longArr {
+		dp[i] = make([]int, len(arr))
+	}
+
+	dp[0][0] = longArr[0][0]
+	dp[1][0] = longArr[0][0] + longArr[1][0]
+	dp[1][1] = longArr[0][0] + longArr[1][1]
+
+	for l := 2; l < level; l++ {
+		levelLen := len(longArr[l])
+		for i := 0; i < levelLen; i++ {
+			if 0 == i {
+				dp[l][i] = dp[l-1][i] + longArr[l][i]
+			} else if i == levelLen-1 {
+				dp[l][i] = dp[l-1][i-1] + longArr[l][i]
+			} else {
+				dp[l][i] = min(dp[l-1][i-1], dp[l-1][i]) + longArr[l][i]
+			}
+		}
+	}
+
+	//fmt.Println(dp)
+	sum := 1<<31 - 1
+	for _, v := range dp[level-1] {
+		if v < sum {
+			sum = v
+		}
 	}
 	return sum
 }
@@ -78,6 +117,7 @@ func initTriangleArr(level int) [][]int {
 func TestMinTriangleSum() {
 	//给定一个三角形，找出自顶向下的最小路径和。每一步只能移动到下一行中相邻的结点上。
 	/**
+	相邻结点定义 2 [3,4] 5 [1,8]
 	[
 	     [2],
 	    [3,4],
@@ -91,7 +131,7 @@ func TestMinTriangleSum() {
 
 	var resultData int
 	loopCount := 1
-	//loopCount = 10000000
+	loopCount = 5000000
 	util.Start("first", "")
 	for i := 0; i < loopCount; i++ {
 		resultData = MinTriangleSum(longArr)
