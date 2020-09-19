@@ -32,6 +32,7 @@ func main() {
 	//------------------dynamic programming---------------------//
 	//dynamic.TestClimbStairs()
 	//dynamic.TestArrayMaxSubArray()
-	dynamic.TestMaxAscendingSubArray()
+	//dynamic.TestMaxAscendingSubArray()
+	dynamic.TestMinTriangleSum()
 
 }

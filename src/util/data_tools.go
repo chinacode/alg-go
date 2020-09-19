@@ -149,3 +149,18 @@ func InitRandArrayRange(num int, min int, max int) []int {
 	}
 	return arr
 }
+
+func InitNoRepeatRandArrayRange(num int, min int, max int) []int {
+	arr := make([]int, num)
+	exists := map[int]int{}
+	for i := 0; i < num; i++ {
+		v := GenerateRangeNum(min, max)
+		for exists[v] > 0 {
+			v = GenerateRangeNum(min, max)
+		}
+
+		exists[v] = 1
+		arr[i] = v
+	}
+	return arr
+}
