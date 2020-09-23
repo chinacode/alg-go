@@ -2,9 +2,38 @@ package util
 
 import (
 	"config"
+	"fmt"
 	"math/rand"
 	"sort"
 )
+
+func Min(a, b int) int {
+	if a > b {
+		return b
+	}
+	return a
+}
+
+func Max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func PrintLevelArray(levelArr [][]int) {
+	for level := 0; level < len(levelArr); level++ {
+		if level == 0 {
+			fmt.Println("[")
+		}
+
+		fmt.Println("	", levelArr[level])
+
+		if level == len(levelArr)-1 {
+			fmt.Println("]")
+		}
+	}
+}
 
 func InitListNodes(linkNum int) *config.ListNode {
 	headNode := &config.ListNode{}
@@ -163,4 +192,12 @@ func InitNoRepeatRandArrayRange(num int, min int, max int) []int {
 		arr[i] = v
 	}
 	return arr
+}
+
+func InitRandLevelArrayRange(level int, num int, min int, max int) [][]int {
+	levelArray := make([][]int, level)
+	for i := 0; i < level; i++ {
+		levelArray[i] = InitNoRepeatRandArrayRange(num, min, max)
+	}
+	return levelArray
 }

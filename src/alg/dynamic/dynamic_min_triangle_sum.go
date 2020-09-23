@@ -28,22 +28,15 @@ func MinTriangleSum2(triangle [][]int) int {
 			} else if j == (len(triangle[i]) - 1) {
 				dp[i][j] = dp[i-1][j-1] + triangle[i][j]
 			} else {
-				dp[i][j] = min(dp[i-1][j-1], dp[i-1][j]) + triangle[i][j]
+				dp[i][j] = util.Min(dp[i-1][j-1], dp[i-1][j]) + triangle[i][j]
 			}
 		}
 	}
 	//fmt.Println(dp)
 	for _, k := range dp[len(dp)-1] {
-		result = min(result, k)
+		result = util.Min(result, k)
 	}
 	return result
-}
-
-func min(a, b int) int {
-	if a > b {
-		return b
-	}
-	return a
 }
 
 /**
@@ -89,7 +82,7 @@ func MinTriangleSum(longArr [][]int) int {
 			} else if i == levelLen-1 {
 				dp[l][i] = dp[l-1][i-1] + longArr[l][i]
 			} else {
-				dp[l][i] = min(dp[l-1][i-1], dp[l-1][i]) + longArr[l][i]
+				dp[l][i] = util.Min(dp[l-1][i-1], dp[l-1][i]) + longArr[l][i]
 			}
 		}
 	}
