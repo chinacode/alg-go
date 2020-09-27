@@ -36,11 +36,7 @@ func StringReverse2(tmpStr string) string {
 }
 
 /**
-L     D     R
-E   O E   I I
-E C   I H   N
-T     S     G
-*/
+ */
 func TestStringReverse() {
 	tmpStr := util.RandStringBytesMask(11)
 
