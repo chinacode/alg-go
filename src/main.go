@@ -34,6 +34,7 @@ func main() {
 	//dynamic.TestArrayMaxSubArray()
 	//dynamic.TestMaxAscendingSubArray()
 	//dynamic.TestMinTriangleSum()
-	dynamic.TestMinPathSum()
+	//dynamic.TestMinPathSum()
+	dynamic.TestTheftMaxMoney()
 
 }
