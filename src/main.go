@@ -1,7 +1,7 @@
 package main
 
 import (
-	"alg/string"
+	"alg/dynamic"
 	"math/rand"
 	"time"
 )
@@ -20,7 +20,7 @@ func main() {
 	//string.TestLongestSamePrefix()
 	//string.TestGetStringZChange()
 	//string.TestStringReverse()
-	string.TestFirstNoRepeatCharacter()
+	//string.TestFirstNoRepeatCharacter()
 
 	//------------------list---------------------//
 	//linked.TestDeleteLinkedReciprocalNode()
@@ -38,6 +38,7 @@ func main() {
 	//dynamic.TestMinTriangleSum()
 	//dynamic.TestMinPathSum()
 	//dynamic.TestTheftMaxMoney()
+	dynamic.TestMinCoinChange()
 
 	//const (
 	//	letterIdxMask = 1<<6 - 1

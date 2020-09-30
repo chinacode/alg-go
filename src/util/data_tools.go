@@ -21,6 +21,14 @@ func Max(a, b int) int {
 	return b
 }
 
+func sum(list []int) int {
+	sum := 0
+	for _, v := range list {
+		sum += v
+	}
+	return sum
+}
+
 func PrintLevelArray(levelArr [][]int) {
 	for level := 0; level < len(levelArr); level++ {
 		if level == 0 {
