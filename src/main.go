@@ -19,7 +19,8 @@ func main() {
 	//------------------string---------------------//
 	//string.TestLongestSamePrefix()
 	//string.TestGetStringZChange()
-	string.TestStringReverse()
+	//string.TestStringReverse()
+	string.TestFirstNoRepeatCharacter()
 
 	//------------------list---------------------//
 	//linked.TestDeleteLinkedReciprocalNode()
