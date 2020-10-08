@@ -9,17 +9,17 @@ func maxMultipe(sum int, num int) int {
 	return sum / num
 }
 
-func MinCoinChange2(nums []int, sum int) []int {
+func MinCoinChange2(nums []int, sum int) int {
 	if len(nums) < 1 {
-		return nums
+		return 0
 	}
 
-	return nums
+	return 0
 }
 
-func MinCoinChange(nums []int, sum int) []int {
+func MinCoinChange(nums []int, sum int) int {
 	if len(nums) < 1 {
-		return nums
+		return 0
 	}
 	dp := make([][]int, len(nums))
 	for i := range nums {
@@ -42,12 +42,12 @@ func MinCoinChange(nums []int, sum int) []int {
 	}
 	util.PrintLevelArray(dp)
 
-	return nums
+	return dp[len(nums)-1][sum-1]
 }
 
-func MinCoinChangeError(nums []int, sum int) []int {
+func MinCoinChangeError(nums []int, sum int) int {
 	if len(nums) < 1 {
-		return nums
+		return 0
 	}
 	for i := len(nums) - 1; i >= 0; i-- {
 		if nums[i] < 0 || nums[i] > 0 {
@@ -69,7 +69,7 @@ func MinCoinChangeError(nums []int, sum int) []int {
 		total = total + num
 	}
 	fmt.Println(total)
-	return nums
+	return 0
 }
 
 /**
@@ -82,7 +82,7 @@ func TestMinCoinChange() {
 	longArr := []int{1, 2, 5, 6}
 	//fmt.Println(longArr)
 
-	var resultData []int
+	var resultData int
 	loopCount := 1
 	//loopCount = 5000000
 	util.Start("first", "")
