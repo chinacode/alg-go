@@ -1,7 +1,7 @@
 package main
 
 import (
-	"alg/dynamic"
+	"demo"
 	"math/rand"
 	"time"
 )
@@ -38,7 +38,7 @@ func main() {
 	//dynamic.TestMinTriangleSum()
 	//dynamic.TestMinPathSum()
 	//dynamic.TestTheftMaxMoney()
-	dynamic.TestMinCoinChange()
+	//dynamic.TestMinCoinChange()
 
 	//const (
 	//	letterIdxMask = 1<<6 - 1
@@ -47,4 +47,6 @@ func main() {
 	//abc := rand_num | letterIdxMask
 	//println(rand_num, abc)
 
+	//demo
+	demo.ExampleClient()
 }
