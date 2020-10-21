@@ -1,7 +1,7 @@
 package main
 
 import (
-	"alg/dynamic"
+	"demo"
 	"math/rand"
 	"time"
 )
@@ -38,7 +38,7 @@ func main() {
 	//dynamic.TestMinTriangleSum()
 	//dynamic.TestMinPathSum()
 	//dynamic.TestTheftMaxMoney()
-	dynamic.TestMinCoinChange()
+	//dynamic.TestMinCoinChange()
 
 	//const (
 	//	letterIdxMask = 1<<6 - 1
@@ -49,4 +49,5 @@ func main() {
 
 	//demo
 	//demo.ExampleClient()
+	demo.DumpSql2Csv()
 }
