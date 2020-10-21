@@ -49,5 +49,6 @@ func main() {
 
 	//demo
 	//demo.ExampleClient()
-	demo.DumpSql2Csv()
+	demo.Dump()
+
 }
