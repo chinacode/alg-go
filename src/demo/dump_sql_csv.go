@@ -80,7 +80,7 @@ func writeCsv(rows *sql.Rows, prefixMap map[uint]EmailPrefix, apiData [][]string
 			emails := []string{email}
 			if prefix.use_status == 1 {
 				apiData = append(apiData, emails)
-			} else {
+			} else if prefix.use_status == 2 {
 				scriptData = append(scriptData, emails)
 			}
 		}
