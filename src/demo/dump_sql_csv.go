@@ -21,8 +21,10 @@ type EmailPrefix struct {
 }
 
 type Email struct {
-	email_name   string
-	email_prefix string
+	email_name    string
+	email_prefix  string
+	email_name2   sql.NullString
+	email_prefix2 sql.NullString
 }
 
 var (
@@ -30,23 +32,6 @@ var (
 	dateTemplate = "2006-01-02"          //常规类型
 )
 
-func getPrefix(db *sql.DB) map[uint]EmailPrefix {
-	//var prefixMap map[int]string
-	rows, _ := db.Query("select * from linkedin_email_prefix")
-	prefixMap := make(map[uint]EmailPrefix)
-	for rows.Next() {
-		var prefix EmailPrefix
-		err := rows.Scan(&prefix.id, &prefix.use_status, &prefix.email_prefix, &prefix.success_count, &prefix.fail_count)
-		if err != nil {
-			log.Fatal(err)
-		}
-		//log.Println(prefix)
-		prefixMap[prefix.id] = prefix
-	}
-
-	log.Println(prefixMap)
-	return prefixMap
-}
 func write(fileName string, data [][]string) {
 	isNew := false
 	f, err := os.Open(fileName)
@@ -67,27 +52,51 @@ func write(fileName string, data [][]string) {
 	w.Flush()
 }
 
-func writeCsv(rows *sql.Rows, prefixMap map[uint]EmailPrefix, apiData [][]string, scriptData [][]string) ([][]string, [][]string) {
+func getPrefix(db *sql.DB) map[uint]EmailPrefix {
+	//var prefixMap map[int]string
+	rows, _ := db.Query("select * from linkedin_email_prefix")
+	prefixMap := make(map[uint]EmailPrefix)
 	for rows.Next() {
-		var email Email
-		err := rows.Scan(&email.email_name, &email.email_prefix)
+		var prefix EmailPrefix
+		err := rows.Scan(&prefix.id, &prefix.use_status, &prefix.email_prefix, &prefix.success_count, &prefix.fail_count)
 		if err != nil {
 			log.Fatal(err)
 		}
+		//log.Println(prefix)
+		prefixMap[prefix.id] = prefix
+	}
+
+	log.Println(prefixMap)
+	return prefixMap
+}
+
+func generateEmail(emailName string, emailPrefix string, prefixMap map[uint]EmailPrefix, apiData [][]string, scriptData [][]string) ([][]string, [][]string) {
+	var prefixList []uint
+	json.Unmarshal([]byte(emailPrefix), &prefixList)
+	for _, id := range prefixList {
+		prefix := prefixMap[id]
+		email := emailName + "@" + prefix.email_prefix
+		emails := []string{email}
+		if prefix.use_status == 1 {
+			apiData = append(apiData, emails)
+		} else if prefix.use_status == 2 {
+			scriptData = append(scriptData, emails)
+		}
+	}
+	return apiData, scriptData
+}
+
+func writeCsv(rows *sql.Rows, prefixMap map[uint]EmailPrefix, apiData [][]string, scriptData [][]string) ([][]string, [][]string) {
+	for rows.Next() {
+		var email Email
+		err := rows.Scan(&email.email_name, &email.email_prefix, &email.email_name2, &email.email_prefix2)
+		if err != nil {
+			log.Fatalf("email prefix scan fail ", err)
+		}
 
 		//log.Println(email.email_name)
-		var prefixList []uint
-		json.Unmarshal([]byte(email.email_prefix), &prefixList)
-		for _, id := range prefixList {
-			prefix := prefixMap[id]
-			email := email.email_name + "@" + prefix.email_prefix
-			emails := []string{email}
-			if prefix.use_status == 1 {
-				apiData = append(apiData, emails)
-			} else if prefix.use_status == 2 {
-				scriptData = append(scriptData, emails)
-			}
-		}
+		apiData, scriptData = generateEmail(email.email_name, email.email_prefix, prefixMap, apiData, scriptData)
+		apiData, scriptData = generateEmail(email.email_name2.String, email.email_prefix2.String, prefixMap, apiData, scriptData)
 	}
 	return apiData, scriptData
 }
@@ -129,13 +138,15 @@ func dumpEmail(host string, port string, user string, password string, dbName st
 
 	prefixMap := getPrefix(db)
 	for index := 0; index < 108; index++ {
-		sql := fmt.Sprintf("SELECT email_name,email_prefix FROM likedin_usernames_%d WHERE email_name != ''", index)
+		//sql := fmt.Sprintf("SELECT email_name,email_prefix,IFNULL(email_name2,'') email_name2,IFNULL(email_prefix2,'[]') email_prefix2 FROM likedin_usernames_%d WHERE 1 = 1 ", index)
+		sql := fmt.Sprintf("SELECT email_name,email_prefix,email_name2,email_prefix2 FROM likedin_usernames_%d WHERE 1 = 1 ", index)
 		if _start.Unix() > 0 {
-			sql = sql + " AND update_time >= " + string(_start.Unix())
+			sql = sql + fmt.Sprintf(" AND update_time >= %d", _start.Unix())
 		}
 		if _end.Unix() > 0 {
-			sql = sql + " AND update_time < " + string(_end.Unix())
+			sql = sql + fmt.Sprintf(" AND update_time < %d", _end.Unix())
 		}
+		sql = sql + " AND email_name != ''"
 		//log.Println(sql)
 		rows, _ := db.Query(sql)
 		if nil == rows {
@@ -144,20 +155,24 @@ func dumpEmail(host string, port string, user string, password string, dbName st
 		apiData, scriptData = writeCsv(rows, prefixMap, apiData, scriptData)
 	}
 
+	ac := len(apiData)
+	sc := len(scriptData)
+	total := ac + sc
 	name := fmt.Sprintf("dump_email_api_(%s~%s).csv", start, end)
 	if start+end == "" {
 		name = "dump_email_api_(all).csv"
 	}
 	write(name, apiData)
-	log.Printf("name: %s, count: %d", name, len(apiData))
+	log.Printf("name: %s, count: %d", name, ac)
 
 	name = fmt.Sprintf("dump_email_script_(%s~%s).csv", start, end)
 	if start+end == "" {
 		name = "dump_email_script_(all).csv"
 	}
 	write(name, scriptData)
-	log.Printf("name: %s, count: %d", name, len(scriptData))
-	log.Printf("dump used time %d", (time.Now().UnixNano()-startTime)/1000/1000)
+	log.Printf("name: %s, count: %d", name, sc)
+	log.Printf("statistics time (%s~%s) total:%d, api:%d, script:%d", start, end, total, ac, sc)
+	log.Printf("dump used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
 }
 
 func Dump() {
