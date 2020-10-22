@@ -28,9 +28,12 @@ type Email struct {
 }
 
 var (
-	timeTemplate = "2006-01-02 15:04:05" //常规类型
-	dateTemplate = "2006-01-02"          //常规类型
-	DEBUG        = false
+	DEBUG         = false
+	dotCount      = 0
+	noDotCount    = 0
+	dateTemplate  = "2006-01-02"          //常规类型
+	timeTemplate  = "2006-01-02 15:04:05" //常规类型
+	statPrefixMap = make(map[string]int64)
 )
 
 func write(fileName string, data [][]string) {
@@ -65,6 +68,7 @@ func getPrefix(db *sql.DB) map[uint]EmailPrefix {
 		}
 		//log.Println(prefix)
 		prefixMap[prefix.id] = prefix
+		statPrefixMap[prefix.email_prefix] = 0
 	}
 
 	if DEBUG {
@@ -73,7 +77,8 @@ func getPrefix(db *sql.DB) map[uint]EmailPrefix {
 	return prefixMap
 }
 
-func generateEmail(emailName string, emailPrefix string, prefixMap map[uint]EmailPrefix, apiData [][]string, scriptData [][]string) ([][]string, [][]string) {
+func generateEmail(emailName string, emailPrefix string, prefixMap map[uint]EmailPrefix, apiData [][]string, scriptData [][]string) ([][]string, [][]string, int) {
+	emailCount := 0
 	var prefixList []uint
 	json.Unmarshal([]byte(emailPrefix), &prefixList)
 	for _, id := range prefixList {
@@ -85,8 +90,10 @@ func generateEmail(emailName string, emailPrefix string, prefixMap map[uint]Emai
 		} else if prefix.use_status == 2 {
 			scriptData = append(scriptData, emails)
 		}
+		emailCount++
+		statPrefixMap[prefix.email_prefix] = statPrefixMap[prefix.email_prefix] + 1
 	}
-	return apiData, scriptData
+	return apiData, scriptData, emailCount
 }
 
 func writeCsv(rows *sql.Rows, prefixMap map[uint]EmailPrefix, apiData [][]string, scriptData [][]string) ([][]string, [][]string) {
@@ -97,9 +104,13 @@ func writeCsv(rows *sql.Rows, prefixMap map[uint]EmailPrefix, apiData [][]string
 			log.Fatalf("email prefix scan fail ", err)
 		}
 
+		emailCount := 0
 		//log.Println(email.email_name)
-		apiData, scriptData = generateEmail(email.email_name, email.email_prefix, prefixMap, apiData, scriptData)
-		apiData, scriptData = generateEmail(email.email_name2.String, email.email_prefix2.String, prefixMap, apiData, scriptData)
+		apiData, scriptData, emailCount = generateEmail(email.email_name, email.email_prefix, prefixMap, apiData, scriptData)
+		noDotCount = noDotCount + emailCount
+
+		apiData, scriptData, emailCount = generateEmail(email.email_name2.String, email.email_prefix2.String, prefixMap, apiData, scriptData)
+		dotCount = dotCount + emailCount
 	}
 	return apiData, scriptData
 }
@@ -180,7 +191,14 @@ func dumpEmail(host string, port string, user string, password string, dbName st
 	}
 	write(name, scriptData)
 	log.Printf("name: %s, count: %d", name, sc)
-	log.Printf("statistics time (%s~%s) total:%d, api:%d, script:%d", start, end, total, ac, sc)
+
+	if DEBUG {
+		for k, v := range statPrefixMap {
+			log.Printf("%s , %d", k, v)
+		}
+	}
+
+	log.Printf("statistics time (%s~%s) total:%d, api:%d, script:%d, noDot:%d, dot:%d", start, end, total, ac, sc, noDotCount, dotCount)
 	log.Printf("dump used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
 }
 
