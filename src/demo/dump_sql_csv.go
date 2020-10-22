@@ -30,6 +30,7 @@ type Email struct {
 var (
 	timeTemplate = "2006-01-02 15:04:05" //常规类型
 	dateTemplate = "2006-01-02"          //常规类型
+	DEBUG        = false
 )
 
 func write(fileName string, data [][]string) {
@@ -66,7 +67,9 @@ func getPrefix(db *sql.DB) map[uint]EmailPrefix {
 		prefixMap[prefix.id] = prefix
 	}
 
-	log.Println(prefixMap)
+	if DEBUG {
+		log.Println(prefixMap)
+	}
 	return prefixMap
 }
 
@@ -101,7 +104,8 @@ func writeCsv(rows *sql.Rows, prefixMap map[uint]EmailPrefix, apiData [][]string
 	return apiData, scriptData
 }
 
-func dumpEmail(host string, port string, user string, password string, dbName string, start string, end string) {
+func dumpEmail(host string, port string, user string, password string, dbName string, start string, end string, _debug bool) {
+	DEBUG = _debug
 	var _start time.Time
 	var _end time.Time
 	if "" != start {
@@ -120,13 +124,16 @@ func dumpEmail(host string, port string, user string, password string, dbName st
 	}
 
 	startTime := time.Now().UnixNano()
-	log.Printf("dump start %d", startTime)
+	log.Printf("dump start %s", time.Now().String())
 	dbUser := flag.String("user", user, "database user")
 	dbPassword := flag.String("password", password, "database password")
 	dbHost := flag.String("hostname", host, "database host")
 	dbPort := flag.String("port", port, "database port")
 
 	dbUrl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", *dbUser, *dbPassword, *dbHost, *dbPort, dbName)
+	if DEBUG {
+		log.Println(dbUrl)
+	}
 	db, err := sql.Open("mysql", dbUrl)
 	if err != nil {
 		log.Fatalf("Could not connect to server: %s\n", err)
@@ -147,7 +154,9 @@ func dumpEmail(host string, port string, user string, password string, dbName st
 			sql = sql + fmt.Sprintf(" AND update_time < %d", _end.Unix())
 		}
 		sql = sql + " AND email_name != ''"
-		//log.Println(sql)
+		if DEBUG {
+			log.Println(sql)
+		}
 		rows, _ := db.Query(sql)
 		if nil == rows {
 			continue
@@ -177,16 +186,20 @@ func dumpEmail(host string, port string, user string, password string, dbName st
 
 func Dump() {
 	args := os.Args
-	if len(args) != 8 && len(args) != 6 {
+	if len(args) != 8 && len(args) != 9 && len(args) != 6 {
 		log.Println(args)
 		log.Println("please enter host port user password dbName fromTime[optional] toTime[optional]")
 		return
 	}
+	if len(args) == 8 {
+		args = append(args, "0")
+	}
 	if len(args) == 6 {
 		args = append(args, "")
 		args = append(args, "")
+		args = append(args, "0")
 	}
-	dumpEmail(args[1], args[2], args[3], args[4], args[5], args[6], args[7])
+	dumpEmail(args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8] == "1")
 	//for test
 	//demo.DumpEmail("192.168.1.200", 3306, "root", "Paramida@2019", "brandu_crawl", "", "")
 }
