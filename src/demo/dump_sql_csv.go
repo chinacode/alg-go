@@ -9,6 +9,7 @@ import (
 	_ "github.com/go-sql-driver/mysql" // or the driver of your choice
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -20,6 +21,9 @@ type EmailPrefix struct {
 	fail_count    uint
 }
 
+type UserName struct {
+	username string
+}
 type Email struct {
 	email_name    string
 	email_prefix  string
@@ -115,8 +119,7 @@ func writeCsv(rows *sql.Rows, prefixMap map[uint]EmailPrefix, apiData [][]string
 	return apiData, scriptData
 }
 
-func dumpEmail(host string, port string, user string, password string, dbName string, start string, end string, _debug bool) {
-	DEBUG = _debug
+func dumpEmail(host string, port string, user string, password string, dbName string, start string, end string) {
 	var _start time.Time
 	var _end time.Time
 	if "" != start {
@@ -202,22 +205,192 @@ func dumpEmail(host string, port string, user string, password string, dbName st
 	log.Printf("dump used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
 }
 
+func stringSpilt(c rune) bool {
+	if c == '-' {
+		return true
+	} else {
+		return false
+	}
+}
+
+func isLetterAndNumber(username string) bool {
+	for _, v := range username {
+		if v < 45 || v > 122 {
+			return false
+		}
+	}
+	return true
+}
+
+func containLetterAndNumber(username string) bool {
+	letter := false
+	number := false
+	for _, v := range username {
+		if v >= 45 && v <= 57 {
+			number = true
+		} else if v >= 65 && v <= 122 {
+			letter = true
+		}
+		if letter && number {
+			return true
+		}
+	}
+	return false
+}
+
+func isNumber(username string) bool {
+	for _, v := range username {
+		if v < 45 || v > 57 {
+			return false
+		}
+	}
+	return true
+}
+
+func isLetter(username string) bool {
+	for _, v := range username {
+		if v < 65 || v > 122 {
+			return false
+		}
+	}
+	return true
+}
+
+func getEmailName(username string) string {
+	//log.Println(username)
+	if !isLetterAndNumber(username) {
+		return ""
+	}
+	//if "a-aziz-hussin-3a794394" == username {
+	//	print(username)
+	//}
+	splitList := strings.FieldsFunc(username, stringSpilt)
+	if len(splitList) == 1 {
+		if len(splitList[0]) > 23 {
+			return ""
+		}
+		return strings.Join(splitList, "")
+	}
+	if len(splitList) == 2 {
+		return strings.Join(splitList, "")
+	}
+	//delete last string random by linkedin
+	if len(splitList) >= 3 && containLetterAndNumber(splitList[len(splitList)-1]) {
+		splitList = splitList[:len(splitList)-1]
+	}
+	//delete too short string
+	for index, string := range splitList {
+		if len(string) <= 2 {
+			splitList[index] = ""
+		}
+	}
+	var letterList []string
+	for _, string := range splitList {
+		if isLetter(string) && len(string) > 2 && len(string) < 20 {
+			letterList = append(letterList, string)
+		}
+	}
+	if len(letterList) <= 2 {
+		return strings.Join(letterList, "")
+	}
+
+	return letterList[0] + letterList[1]
+}
+
+func dumpUnValidEmail(host string, port string, user string, password string, dbName string, limit string) {
+	startTime := time.Now().UnixNano()
+	log.Printf("dump start %s", time.Now().String())
+	dbUser := flag.String("user", user, "database user")
+	dbPassword := flag.String("password", password, "database password")
+	dbHost := flag.String("hostname", host, "database host")
+	dbPort := flag.String("port", port, "database port")
+
+	dbUrl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", *dbUser, *dbPassword, *dbHost, *dbPort, dbName)
+	if DEBUG {
+		log.Println(dbUrl)
+	}
+	db, err := sql.Open("mysql", dbUrl)
+	if err != nil {
+		log.Fatalf("Could not connect to server: %s\n", err)
+	}
+	defer db.Close()
+
+	var allData [][]string
+	prefixMap := getPrefix(db)
+
+	var prefixList []string
+	for _, v := range prefixMap {
+		if v.use_status <= 0 || v.email_prefix == "username_count" {
+			continue
+		}
+		prefixList = append(prefixList, v.email_prefix)
+	}
+
+	for index := 0; index < 108; index++ {
+		sql := fmt.Sprintf("SELECT username FROM likedin_usernames_%d WHERE finished = 1 AND email_name = '' limit %s", index, limit)
+		if DEBUG {
+			log.Println(sql)
+		}
+		rows, _ := db.Query(sql)
+		if nil == rows {
+			continue
+		}
+		for rows.Next() {
+			var username UserName
+			err := rows.Scan(&username.username)
+			if err != nil {
+				log.Fatalf("email prefix scan fail %s", err)
+			}
+			emailName := getEmailName(username.username)
+			if emailName == "" || len(emailName) <= 3 {
+				continue
+			}
+			//log.Printf("%s %s", username, emailName)
+			for _, prefix := range prefixList {
+				email := fmt.Sprintf("%s@%s", emailName, prefix)
+				allData = append(allData, []string{email})
+			}
+		}
+	}
+
+	ac := len(allData)
+	name := fmt.Sprintf("dump_email_un_valid_(%s).csv", limit)
+	write(name, allData)
+	log.Printf("name: %s, count: %d", name, ac)
+	log.Printf("dump used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
+}
+
 func Dump() {
 	args := os.Args
-	if len(args) != 8 && len(args) != 9 && len(args) != 6 {
+	if len(args) != 8 && len(args) != 9 && len(args) != 10 && len(args) != 7 {
 		log.Println(args)
-		log.Println("please enter host port user password dbName fromTime[optional] toTime[optional]")
+		log.Println("please enter method[1:valid,2:unValid] \n" +
+			"method[1] host port user password dbName fromTime[optional] toTime[optional] debug[optional default 0]\n" +
+			"method[2] host port user password dbName limit debug[optional default 0]")
 		return
 	}
-	if len(args) == 8 {
-		args = append(args, "0")
+	if args[1] == "1" {
+		if len(args) == 9 {
+			args = append(args, "0")
+		}
+		if len(args) == 7 {
+			args = append(args, "")
+			args = append(args, "")
+			args = append(args, "0")
+		}
+		DEBUG = args[9] == "1"
+		dumpEmail(args[2], args[3], args[4], args[5], args[6], args[7], args[8])
+	} else if args[1] == "2" {
+		if len(args) == 8 {
+			args = append(args, "0")
+		}
+		DEBUG = args[8] == "1"
+		//getEmailName("-0123456789+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+		//getEmailName("владимир-конельский-144497158")
+		//getEmailName("4d-ageng-anom-1a975518b")
+		dumpUnValidEmail(args[2], args[3], args[4], args[5], args[6], args[7])
+
 	}
-	if len(args) == 6 {
-		args = append(args, "")
-		args = append(args, "")
-		args = append(args, "0")
-	}
-	dumpEmail(args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8] == "1")
 	//for test
 	//demo.DumpEmail("192.168.1.200", 3306, "root", "Paramida@2019", "brandu_crawl", "", "")
 }
