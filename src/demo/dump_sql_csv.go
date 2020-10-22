@@ -41,6 +41,7 @@ var (
 )
 
 func write(fileName string, data [][]string) {
+	os.Remove(fileName)
 	isNew := false
 	f, err := os.Open(fileName)
 	if err != nil {
