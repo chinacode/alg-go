@@ -49,6 +49,7 @@ func main() {
 
 	//demo
 	//demo.ExampleClient()
-	demo.Dump()
+	//demo.Dump()
 
+	demo.Main()
 }
