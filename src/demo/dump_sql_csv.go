@@ -8,6 +8,8 @@ import (
 	"fmt"
 	_ "github.com/go-sql-driver/mysql" // or the driver of your choice
 	"github.com/shopspring/decimal"
+	"github.com/steakknife/bloomfilter"
+	"hash/fnv"
 	"io"
 	"log"
 	"os"
@@ -45,13 +47,19 @@ type EmailData struct {
 }
 
 var (
-	DEBUG         = false
-	dotCount      = 0
-	noDotCount    = 0
-	SPLIT         = rune('-')
-	dateTemplate  = "2006-01-02"          //常规类型
-	timeTemplate  = "2006-01-02 15:04:05" //常规类型
+	DEBUG        = false
+	dotCount     = 0
+	noDotCount   = 0
+	SPLIT        = rune('-')
+	dateTemplate = "2006-01-02"          //常规类型
+	timeTemplate = "2006-01-02 15:04:05" //常规类型
+
+	maxElements   = uint64(500 * 10000)
+	probCollide   = 0.0000001
 	statPrefixMap = make(map[string]int64)
+
+	repeatCount        = 0
+	bloomInstance, err = bloomfilter.NewOptimal(maxElements, probCollide) //check repeat email
 )
 
 func write(fileName string, data [][]string) {
@@ -69,6 +77,29 @@ func write(fileName string, data [][]string) {
 	w := csv.NewWriter(f) //创建一个新的写入文件流
 	w.WriteAll(data)
 	w.Flush()
+}
+
+func readCsv(filename string) [][]string {
+	var lines [][]string
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Println("Error:", err)
+		return lines
+	}
+	defer file.Close()
+	reader := csv.NewReader(file)
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			continue
+			//fmt.Println("Error:", err)
+			//return lines
+		}
+		lines = append(lines, record)
+	}
+	return lines
 }
 
 func getPrefix(db *sql.DB) map[uint]EmailPrefix {
@@ -99,6 +130,12 @@ func generateEmail(emailName string, emailPrefix string, prefixMap map[uint]Emai
 	for _, id := range prefixList {
 		prefix := prefixMap[id]
 		email := emailName + "@" + prefix.email_prefix
+		hash := fnv.New64()
+		hash.Write([]byte(email))
+		if bloomInstance.Contains(hash) {
+			repeatCount++
+			continue
+		}
 		emails := []string{email}
 		if prefix.use_status == 1 {
 			apiData = append(apiData, emails)
@@ -107,16 +144,18 @@ func generateEmail(emailName string, emailPrefix string, prefixMap map[uint]Emai
 		}
 		emailCount++
 		statPrefixMap[prefix.email_prefix] = statPrefixMap[prefix.email_prefix] + 1
+
+		bloomInstance.Add(hash)
 	}
 	return apiData, scriptData, emailCount
 }
 
-func writeCsv(rows *sql.Rows, prefixMap map[uint]EmailPrefix, apiData [][]string, scriptData [][]string) ([][]string, [][]string) {
+func generateEmailList(rows *sql.Rows, prefixMap map[uint]EmailPrefix, apiData [][]string, scriptData [][]string) ([][]string, [][]string) {
 	for rows.Next() {
 		var email Email
 		err := rows.Scan(&email.email_name, &email.email_prefix, &email.email_name2, &email.email_prefix2)
 		if err != nil {
-			log.Fatalf("email prefix scan fail ", err)
+			log.Fatalf("email prefix scan fail %s", err)
 		}
 
 		emailCount := 0
@@ -128,29 +167,6 @@ func writeCsv(rows *sql.Rows, prefixMap map[uint]EmailPrefix, apiData [][]string
 		dotCount = dotCount + emailCount
 	}
 	return apiData, scriptData
-}
-
-func readCsv(filename string) [][]string {
-	var lines [][]string
-	file, err := os.Open(filename)
-	if err != nil {
-		log.Println("Error:", err)
-		return lines
-	}
-	defer file.Close()
-	reader := csv.NewReader(file)
-	for {
-		record, err := reader.Read()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			continue
-			//fmt.Println("Error:", err)
-			//return lines
-		}
-		lines = append(lines, record)
-	}
-	return lines
 }
 
 func dumpEmail(host string, port string, user string, password string, dbName string, start string, end string) {
@@ -209,7 +225,7 @@ func dumpEmail(host string, port string, user string, password string, dbName st
 		if nil == rows {
 			continue
 		}
-		apiData, scriptData = writeCsv(rows, prefixMap, apiData, scriptData)
+		apiData, scriptData = generateEmailList(rows, prefixMap, apiData, scriptData)
 	}
 
 	ac := len(apiData)
@@ -235,7 +251,7 @@ func dumpEmail(host string, port string, user string, password string, dbName st
 		}
 	}
 
-	log.Printf("statistics time (%s~%s) total:%d, api:%d, script:%d, noDot:%d, dot:%d", start, end, total, ac, sc, noDotCount, dotCount)
+	log.Printf("statistics time (%s~%s) total:%d, api:%d, script:%d, noDot:%d, dot:%d, repeat %d", start, end, total, ac, sc, noDotCount, dotCount, repeatCount)
 	log.Printf("dump used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
 }
 
@@ -320,13 +336,28 @@ func getEmailNames(nameList []string) []string {
 func isMixing(username string) bool {
 	n, l := countNumberLetter(username)
 	value, _ := decimal.NewFromFloat(float64(n)).Div(decimal.NewFromFloat(float64(l + n))).Float64()
-	percent := value > 0.25
+	percent := value > 0.20 && value < 0.5
 
+	last := 0
+	change := 0
 	for _, v := range username {
-		println(string(v))
+		tmpLast := 0
+		if v >= 45 && v <= 57 { //number check
+			tmpLast = 1
+		} else if v >= 65 && v <= 122 { //letter check
+			tmpLast = 2
+		}
+		if last == 0 {
+			last = tmpLast
+		}
+		if last != tmpLast {
+			change++
+			//println(string(v))
+			last = tmpLast
+		}
 	}
-
-	return percent
+	//println(username, percent, change)
+	return percent || change >= 3
 }
 
 func getEmailName(username string) []string {
@@ -427,7 +458,16 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 				tmpEmails = append(tmpEmails, emailName)
 				for _, prefix := range prefixList {
 					email := fmt.Sprintf("%s@%s", emailName, prefix)
+
+					hash := fnv.New64()
+					hash.Write([]byte(email))
+					if bloomInstance.Contains(hash) {
+						repeatCount++
+						continue
+					}
+
 					emailData = append(emailData, []string{email})
+					bloomInstance.Add(hash)
 				}
 			}
 			allData = append(allData, tmpEmails)
@@ -438,7 +478,7 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 	write(name, emailData)
 	name = fmt.Sprintf("dump_email_import_(%s).csv", limit)
 	write(name, allData)
-	log.Printf("name: %s, count: %d", name, len(allData))
+	log.Printf("name: %s, user count: %d, email count:%d, repeat %d", name, len(allData), len(emailData), repeatCount)
 	log.Printf("dump used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
 }
 
@@ -577,13 +617,14 @@ func importEmail(host string, port string, user string, password string, dbName 
 }
 
 func Dump() {
+	readme := "please enter method[1:dump valid email,2:dump un valid email,3:import valid email ] \n" +
+		"method[1] host port user password dbName fromTime[optional] toTime[optional] debug[optional default 0]\n" +
+		"method[2] host port user password dbName status[0:all] limit debug[optional default 0]\n" +
+		"method[3] host port user password dbName indexFile importFile debug[optional default 0]"
 	args := os.Args
 	if len(args) != 8 && len(args) != 9 && len(args) != 10 && len(args) != 7 {
 		log.Println(args)
-		log.Println("please enter method[1:dump valid email,2:dump un valid email,3:import valid email ] \n" +
-			"method[1] host port user password dbName fromTime[optional] toTime[optional] debug[optional default 0]\n" +
-			"method[2] host port user password dbName status[0:all] limit debug[optional default 0]\n" +
-			"method[3] host port user password dbName indexFile importFile debug[optional default 0]")
+		log.Println(readme)
 		return
 	}
 	if args[1] == "1" {
@@ -605,8 +646,10 @@ func Dump() {
 		//getEmailName("-0123456789+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
 		//getEmailName("владимир-конельский-144497158")
 		//getEmailName("4d-ageng-anom-1a975518b")
+		//println(isMixing("5a50a6162"))
+		//println(isMixing("411884187"))
+		//println(isMixing("a18b61117"))
 		dumpUnValidEmail(args[2], args[3], args[4], args[5], args[6], args[7], args[8])
-		println(isMixing("5a50a6162"))
 	} else if args[1] == "3" {
 		if len(args) == 9 {
 			args = append(args, "0")
@@ -617,6 +660,8 @@ func Dump() {
 		//getEmailName("4d-ageng-anom-1a975518b")
 		importEmail(args[2], args[3], args[4], args[5], args[6], args[7], args[8])
 		//println(isMixing("5a50a6162"))
+	} else {
+		log.Println(readme)
 	}
 	//for test
 	//demo.DumpEmail("192.168.1.200", 3306, "root", "Paramida@2019", "brandu_crawl", "", "")
