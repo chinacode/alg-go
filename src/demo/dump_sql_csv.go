@@ -7,8 +7,11 @@ import (
 	"flag"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql" // or the driver of your choice
+	"github.com/shopspring/decimal"
+	"io"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -22,8 +25,10 @@ type EmailPrefix struct {
 }
 
 type UserName struct {
+	id       int64
 	username string
 }
+
 type Email struct {
 	email_name    string
 	email_prefix  string
@@ -31,10 +36,19 @@ type Email struct {
 	email_prefix2 sql.NullString
 }
 
+type EmailData struct {
+	email_name    string
+	email_prefix  []uint
+	email_name2   string
+	email_prefix2 []uint
+	unValid       bool
+}
+
 var (
 	DEBUG         = false
 	dotCount      = 0
 	noDotCount    = 0
+	SPLIT         = rune('-')
 	dateTemplate  = "2006-01-02"          //常规类型
 	timeTemplate  = "2006-01-02 15:04:05" //常规类型
 	statPrefixMap = make(map[string]int64)
@@ -42,20 +56,16 @@ var (
 
 func write(fileName string, data [][]string) {
 	os.Remove(fileName)
-	isNew := false
-	f, err := os.Open(fileName)
-	if err != nil {
-		isNew = true
-		f, err = os.Create(fileName)
-	}
+	//isNew := false
+	f, err := os.Create(fileName)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	defer f.Close()
-	if isNew {
-		f.WriteString("\xEF\xBB\xBF") // 写入一个UTF-8 BOM
-	}
+	//if isNew {
+	f.WriteString("\xEF\xBB\xBF") // 写入一个UTF-8 BOM
+	//}
 	w := csv.NewWriter(f) //创建一个新的写入文件流
 	w.WriteAll(data)
 	w.Flush()
@@ -118,6 +128,29 @@ func writeCsv(rows *sql.Rows, prefixMap map[uint]EmailPrefix, apiData [][]string
 		dotCount = dotCount + emailCount
 	}
 	return apiData, scriptData
+}
+
+func readCsv(filename string) [][]string {
+	var lines [][]string
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Println("Error:", err)
+		return lines
+	}
+	defer file.Close()
+	reader := csv.NewReader(file)
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			continue
+			//fmt.Println("Error:", err)
+			//return lines
+		}
+		lines = append(lines, record)
+	}
+	return lines
 }
 
 func dumpEmail(host string, port string, user string, password string, dbName string, start string, end string) {
@@ -207,7 +240,7 @@ func dumpEmail(host string, port string, user string, password string, dbName st
 }
 
 func stringSpilt(c rune) bool {
-	if c == '-' {
+	if c == SPLIT {
 		return true
 	} else {
 		return false
@@ -257,48 +290,79 @@ func isLetter(username string) bool {
 	return true
 }
 
-func getEmailName(username string) string {
-	//log.Println(username)
-	if !isLetterAndNumber(username) {
-		return ""
+func countNumberLetter(username string) (int8, int8) {
+	var n int8
+	var l int8
+	for _, v := range username {
+		if v >= 45 && v <= 57 {
+			n++
+		} else if v >= 65 && v <= 122 {
+			l++
+		}
 	}
-	//if "a-aziz-hussin-3a794394" == username {
-	//	print(username)
-	//}
+	return n, l
+}
+
+func getEmailNames(nameList []string) []string {
+	if len(nameList) <= 0 {
+		return []string{}
+	}
+	if len(nameList) == 1 {
+		return []string{nameList[0]}
+	}
+	if len(nameList) == 2 {
+		return []string{strings.Join(nameList, ""), strings.Join(nameList, ".")}
+	}
+	nameList = nameList[:2]
+	return []string{strings.Join(nameList, ""), strings.Join(nameList, ".")}
+}
+
+func isMixing(username string) bool {
+	n, l := countNumberLetter(username)
+	value, _ := decimal.NewFromFloat(float64(n)).Div(decimal.NewFromFloat(float64(l + n))).Float64()
+	percent := value > 0.25
+
+	for _, v := range username {
+		println(string(v))
+	}
+
+	return percent
+}
+
+func getEmailName(username string) []string {
+	//log.Println(username)
+	var emails []string
+	if !isLetterAndNumber(username) || len(username) <= 3 {
+		return emails
+	}
 	splitList := strings.FieldsFunc(username, stringSpilt)
 	if len(splitList) == 1 {
-		if len(splitList[0]) > 23 {
-			return ""
+		if len(splitList[0]) > 23 || isMixing(splitList[0]) {
+			return emails
 		}
-		return strings.Join(splitList, "")
-	}
-	if len(splitList) == 2 {
-		return strings.Join(splitList, "")
+		return getEmailNames(splitList)
 	}
 	//delete last string random by linkedin
 	if len(splitList) >= 3 && containLetterAndNumber(splitList[len(splitList)-1]) {
 		splitList = splitList[:len(splitList)-1]
 	}
 	//delete too short string
-	for index, string := range splitList {
-		if len(string) <= 2 {
-			splitList[index] = ""
-		}
-	}
 	var letterList []string
 	for _, string := range splitList {
-		if isLetter(string) && len(string) > 2 && len(string) < 20 {
-			letterList = append(letterList, string)
+		if len(string) <= 2 || isMixing(string) || len(string) > 23 {
+			continue
 		}
+		letterList = append(letterList, string)
 	}
 	if len(letterList) <= 2 {
-		return strings.Join(letterList, "")
+		return getEmailNames(letterList)
 	}
 
-	return letterList[0] + letterList[1]
+	return getEmailNames(letterList)
 }
 
-func dumpUnValidEmail(host string, port string, user string, password string, dbName string, limit string) {
+func dumpUnValidEmail(host string, port string, user string, password string, dbName string, status string, limit string) {
+	SPLIT = rune('-')
 	startTime := time.Now().UnixNano()
 	log.Printf("dump start %s", time.Now().String())
 	dbUser := flag.String("user", user, "database user")
@@ -316,6 +380,9 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 	}
 	defer db.Close()
 
+	//for email checker
+	var emailData [][]string
+	//for import data
 	var allData [][]string
 	prefixMap := getPrefix(db)
 
@@ -324,11 +391,17 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 		if v.use_status <= 0 || v.email_prefix == "username_count" {
 			continue
 		}
+		if "1" == status && v.use_status != 1 {
+			continue
+		}
+		if "2" == status && v.use_status != 2 {
+			continue
+		}
 		prefixList = append(prefixList, v.email_prefix)
 	}
 
 	for index := 0; index < 108; index++ {
-		sql := fmt.Sprintf("SELECT username FROM likedin_usernames_%d WHERE finished = 1 AND email_name = '' limit %s", index, limit)
+		sql := fmt.Sprintf("SELECT id,username FROM likedin_usernames_%d WHERE finished = 1 AND email_name = '' limit %s", index, limit)
 		if DEBUG {
 			log.Println(sql)
 		}
@@ -338,36 +411,179 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 		}
 		for rows.Next() {
 			var username UserName
-			err := rows.Scan(&username.username)
+			err := rows.Scan(&username.id, &username.username)
 			if err != nil {
 				log.Fatalf("email prefix scan fail %s", err)
 			}
-			emailName := getEmailName(username.username)
-			if emailName == "" || len(emailName) <= 3 {
+			emailNames := getEmailName(username.username)
+			if len(emailNames) <= 0 {
 				continue
 			}
+			indexString := strconv.Itoa(index)
+			idString := strconv.FormatInt(username.id, 10)
+			tmpEmails := []string{indexString, idString}
 			//log.Printf("%s %s", username, emailName)
-			for _, prefix := range prefixList {
-				email := fmt.Sprintf("%s@%s", emailName, prefix)
-				allData = append(allData, []string{email})
+			for _, emailName := range emailNames {
+				tmpEmails = append(tmpEmails, emailName)
+				for _, prefix := range prefixList {
+					email := fmt.Sprintf("%s@%s", emailName, prefix)
+					emailData = append(emailData, []string{email})
+				}
 			}
+			allData = append(allData, tmpEmails)
 		}
 	}
 
-	ac := len(allData)
-	name := fmt.Sprintf("dump_email_un_valid_(%s).csv", limit)
+	name := fmt.Sprintf("dump_email_checker_(%s).csv", limit)
+	write(name, emailData)
+	name = fmt.Sprintf("dump_email_import_(%s).csv", limit)
 	write(name, allData)
-	log.Printf("name: %s, count: %d", name, ac)
+	log.Printf("name: %s, count: %d", name, len(allData))
 	log.Printf("dump used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
+}
+
+func importEmail(host string, port string, user string, password string, dbName string, indexFile string, importFile string) {
+	SPLIT = rune('@')
+	startTime := time.Now().UnixNano()
+	log.Printf("dump start %s", time.Now().String())
+	dbUser := flag.String("user", user, "database user")
+	dbPassword := flag.String("password", password, "database password")
+	dbHost := flag.String("hostname", host, "database host")
+	dbPort := flag.String("port", port, "database port")
+
+	dbUrl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", *dbUser, *dbPassword, *dbHost, *dbPort, dbName)
+	if DEBUG {
+		log.Println(dbUrl)
+	}
+	db, err := sql.Open("mysql", dbUrl)
+
+	if err != nil {
+		log.Fatalf("Could not connect to server: %s\n", err)
+	}
+	defer db.Close()
+
+	prefixMap := getPrefix(db)
+	prefixIdMap := map[string]uint{}
+	for k, v := range prefixMap {
+		prefixIdMap[v.email_prefix] = k
+	}
+
+	updateTime := time.Now().Unix()
+	indexList := readCsv(indexFile)
+	namesMap := make(map[string][]string)
+	for _, indexEmail := range indexList {
+		key := strings.TrimSpace(indexEmail[2])
+		if nil != namesMap[key] {
+			log.Println(indexEmail)
+		}
+		id := indexEmail[1]
+		index := indexEmail[0]
+		if !isNumber(index) {
+			index = "0"
+		}
+		namesMap[key] = []string{index, id}
+	}
+
+	failCount := 0
+	successCount := 0
+	emailName := ""
+	var emailData EmailData
+	tx, _ := db.Begin()
+	importList := readCsv(importFile)
+	for _, importEmail := range importList {
+		emails := strings.FieldsFunc(importEmail[0], stringSpilt)
+		if "" == emailName {
+			emailName = emails[0]
+		}
+
+		prefix := prefixIdMap[emails[1]]
+		if strings.Contains(emails[0], ".") {
+			emailData.email_name2 = emails[0]
+			emailData.email_prefix2 = append(emailData.email_prefix2, prefix)
+			//replace .
+			emails[0] = strings.Replace(emails[0], ".", "", len(emails[0]))
+		} else {
+			emailData.email_name = emails[0]
+			emailData.email_prefix = append(emailData.email_prefix, prefix)
+		}
+		if emailName != emails[0] {
+			//log.Println(emailName)
+			//emailName = "hambali"
+			//log.Println(emailName, namesMap["hambali"])
+			namesIndex := namesMap[emailName]
+			if nil == namesIndex {
+				emailData = EmailData{}
+				emailName = emails[0]
+				continue
+			}
+			id := namesIndex[1]
+			tableIndex := namesIndex[0]
+			prefixJson, _ := json.Marshal(emailData.email_prefix)
+			prefix2Json, _ := json.Marshal(emailData.email_prefix2)
+			prefix2JsonStr := string(prefix2Json)
+			if prefix2JsonStr == "null" {
+				prefix2JsonStr = "[]"
+			}
+
+			sql := fmt.Sprintf(
+				"update likedin_usernames_%s set finished = 1,email_name = '%s', email_prefix = '%s',email_name2 = '%s', email_prefix2 = '%s',update_time = %d where id = %s limit 1",
+				tableIndex, emailData.email_name, string(prefixJson), emailData.email_name2, prefix2JsonStr, updateTime, id)
+			if DEBUG {
+				log.Println(sql)
+			}
+
+			//_, err := db.Exec(sql)
+			_, err := tx.Exec(sql)
+			if nil != err {
+				log.Fatalln(err)
+			}
+
+			//count, err := ret.RowsAffected()
+			successCount++
+
+			//reset
+			emailData = EmailData{}
+			emailName = emails[0]
+			//reset names Map for finish fail
+			namesMap[emailName] = nil
+		}
+	}
+	tx.Commit()
+
+	tx, _ = db.Begin()
+	for _, v := range namesMap {
+		if nil == v {
+			//ok data
+			continue
+		}
+		id := v[1]
+		tableIndex := v[0]
+		sql := fmt.Sprintf("update likedin_usernames_%s set finished = 1,update_time = %d where id = %s limit 1", tableIndex, updateTime, id)
+		if DEBUG {
+			log.Println(sql)
+		}
+		//_, err := db.Exec(sql)
+		_, err := tx.Exec(sql)
+		if nil != err {
+			log.Fatalln(err)
+		}
+		//count, err := ret.RowsAffected()
+		failCount++
+	}
+	tx.Commit()
+
+	log.Printf("statstics success %d, fail %d ", successCount, failCount)
+	log.Printf("import used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
 }
 
 func Dump() {
 	args := os.Args
 	if len(args) != 8 && len(args) != 9 && len(args) != 10 && len(args) != 7 {
 		log.Println(args)
-		log.Println("please enter method[1:valid,2:unValid] \n" +
+		log.Println("please enter method[1:dump valid email,2:dump un valid email,3:import valid email ] \n" +
 			"method[1] host port user password dbName fromTime[optional] toTime[optional] debug[optional default 0]\n" +
-			"method[2] host port user password dbName limit debug[optional default 0]")
+			"method[2] host port user password dbName status[0:all] limit debug[optional default 0]\n" +
+			"method[3] host port user password dbName indexFile importFile debug[optional default 0]")
 		return
 	}
 	if args[1] == "1" {
@@ -382,15 +598,25 @@ func Dump() {
 		DEBUG = args[9] == "1"
 		dumpEmail(args[2], args[3], args[4], args[5], args[6], args[7], args[8])
 	} else if args[1] == "2" {
-		if len(args) == 8 {
+		if len(args) == 9 {
 			args = append(args, "0")
 		}
-		DEBUG = args[8] == "1"
+		DEBUG = args[9] == "1"
 		//getEmailName("-0123456789+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
 		//getEmailName("владимир-конельский-144497158")
 		//getEmailName("4d-ageng-anom-1a975518b")
-		dumpUnValidEmail(args[2], args[3], args[4], args[5], args[6], args[7])
-
+		dumpUnValidEmail(args[2], args[3], args[4], args[5], args[6], args[7], args[8])
+		println(isMixing("5a50a6162"))
+	} else if args[1] == "3" {
+		if len(args) == 9 {
+			args = append(args, "0")
+		}
+		DEBUG = args[9] == "1"
+		//getEmailName("-0123456789+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+		//getEmailName("владимир-конельский-144497158")
+		//getEmailName("4d-ageng-anom-1a975518b")
+		importEmail(args[2], args[3], args[4], args[5], args[6], args[7], args[8])
+		//println(isMixing("5a50a6162"))
 	}
 	//for test
 	//demo.DumpEmail("192.168.1.200", 3306, "root", "Paramida@2019", "brandu_crawl", "", "")
