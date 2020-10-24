@@ -1,11 +1,13 @@
 package demo
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/steakknife/bloomfilter"
 	"hash/fnv"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -25,6 +27,12 @@ var (
 	SERVER_NAME = "bloomfilter server "
 )
 
+type Result struct {
+	code int8
+	msg  string
+	data string
+}
+
 func Main() {
 	SPLIT = rune(',')
 	http.HandleFunc("/config", Config)
@@ -32,9 +40,22 @@ func Main() {
 	http.HandleFunc("/batch_add", BatchAdd)
 	http.HandleFunc("/exists", Exists)
 	http.HandleFunc("/clear", Clear)
+	http.HandleFunc("/save", Save)
+	http.HandleFunc("/load", Load)
+	http.HandleFunc("/memory", Memory)
+	http.HandleFunc("/key_count", KeyCount)
 
 	log.Println(SERVER_NAME + " start success " + strconv.Itoa(SERVER_PORT))
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(SERVER_PORT), nil))
+}
+
+func getErrorResult(msg string) Result {
+	return Result{code: http.StatusInternalServerError, msg: msg, data: nil}
+}
+
+func getResult(data map[string]string) Result {
+	jsonData, _ := json.Marshal(data)
+	return Result{code: http.StatusOK, msg: "success", data: string(jsonData)}
 }
 
 func initParams(response http.ResponseWriter, request *http.Request) (bool, map[string]bool) {
@@ -104,25 +125,6 @@ func initBucket() {
 	if len(bucket) > 0 {
 		bloomfilterMap[bucket], err = bloomfilter.NewOptimal(elements, percent)
 	}
-}
-
-func Config(response http.ResponseWriter, request *http.Request) {
-	check, params := initParams(response, request)
-	if !check {
-		return
-	}
-	if bloomfilterMap[bucket] != nil {
-		response.WriteHeader(http.StatusBadRequest)
-		response.Write([]byte(fmt.Sprintf("bucket %s exists, please reset first", bucket)))
-		return
-	}
-	if !params["percent"] || !params["elements"] {
-		response.WriteHeader(http.StatusBadRequest)
-		response.Write([]byte(fmt.Sprintf("percent(%f) and elements(%d) must set!", percent, elements)))
-		return
-	}
-	bloomfilterMap[bucket], err = bloomfilter.NewOptimal(elements, percent)
-	response.Write([]byte("success"))
 }
 
 func BatchAdd(response http.ResponseWriter, request *http.Request) {
@@ -195,4 +197,72 @@ func Clear(response http.ResponseWriter, request *http.Request) {
 	}
 	bloomfilterMap[bucket] = nil
 	response.Write([]byte("success"))
+}
+
+func Memory(response http.ResponseWriter, request *http.Request) {
+	check, _ := initParams(response, request)
+	if !check {
+		return
+	}
+
+	response.Write([]byte(fmt.Sprintf("%d", bloomfilterMap[bucket].M())))
+}
+
+func KeyCount(response http.ResponseWriter, request *http.Request) {
+	check, _ := initParams(response, request)
+	if !check {
+		return
+	}
+	response.Write([]byte(fmt.Sprintf("%d", bloomfilterMap[bucket].K())))
+}
+
+func Config(response http.ResponseWriter, request *http.Request) {
+	check, params := initParams(response, request)
+	if !check {
+		return
+	}
+	if bloomfilterMap[bucket] != nil {
+		response.WriteHeader(http.StatusBadRequest)
+		response.Write([]byte(fmt.Sprintf("bucket %s exists, please reset first", bucket)))
+		return
+	}
+	if !params["percent"] || !params["elements"] {
+		response.WriteHeader(http.StatusBadRequest)
+		response.Write([]byte(fmt.Sprintf("percent(%f) and elements(%d) must set!", percent, elements)))
+		return
+	}
+	bloomfilterMap[bucket], err = bloomfilter.NewOptimal(elements, percent)
+	response.Write([]byte("success"))
+}
+
+func Load(response http.ResponseWriter, request *http.Request) {
+	check, _ := initParams(response, request)
+	if !check {
+		return
+	}
+	filename := fmt.Sprintf("BF.%s.bucket", bucket)
+
+	r, err := os.Open(filename)
+	if err != nil {
+		response.WriteHeader(http.StatusBadRequest)
+		response.Write([]byte(fmt.Sprintf("back file %s not exists", filename)))
+		return
+	}
+	defer func() {
+		err = r.Close()
+	}()
+
+	bloomfilterMap[bucket].ReadFrom(r)
+	response.Write([]byte(fmt.Sprintf("load from file %s success", filename)))
+}
+
+func Save(response http.ResponseWriter, request *http.Request) {
+	check, _ := initParams(response, request)
+	if !check {
+		return
+	}
+
+	filename := fmt.Sprintf("BF.%s.bucket", bucket)
+	bloomfilterMap[bucket].WriteFile(filename)
+	response.Write([]byte(fmt.Sprintf("save to file %s success", filename)))
 }
