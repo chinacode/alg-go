@@ -12,21 +12,27 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
 	//_maxElements         = uint64(500 * 10000)
 	//_probCollide         = 0.0000001
 
-	key            = ""
-	keys           = ""
-	bucket         = ""
-	percent        = 0.0000001
-	elements       = uint64(500 * 10000)
-	bloomfilterMap = map[string]*bloomfilter.Filter{}
+	key      = ""
+	keys     = ""
+	bucket   = ""
+	percent  = 0.0000001
+	elements = uint64(1000 * 10000)
 
-	SERVER_PORT = 9002
-	SERVER_NAME = "bloomfilter server "
+	backDumpPrefix      = "BF"
+	bloomfilterCountMap = map[string]uint64{}
+	bloomfilterMap      = map[string]*bloomfilter.Filter{}
+
+	serverPort = 9002
+	serverName = "bloomfilter server "
+
+	saveTimer = time.NewTimer(time.Second * 2)
 )
 
 type Result struct {
@@ -36,8 +42,6 @@ type Result struct {
 }
 
 func Main() {
-	SPLIT = rune(',')
-
 	http.HandleFunc("/config", Config)
 	http.HandleFunc("/add", Add)
 	http.HandleFunc("/batch_add", BatchAdd)
@@ -49,8 +53,66 @@ func Main() {
 	http.HandleFunc("/memory", Memory)
 	http.HandleFunc("/key_count", KeyCount)
 
-	log.Println(SERVER_NAME + " start success " + strconv.Itoa(SERVER_PORT))
-	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(SERVER_PORT), nil))
+	startSaveTask()
+	go loadOldData()
+	log.Println(serverName + " start success " + strconv.Itoa(serverPort))
+	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(serverPort), nil))
+}
+
+func loadOldData() {
+	pwd, _ := os.Getwd()
+	fileInfoList, err := ioutil.ReadDir(pwd)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(len(fileInfoList))
+	for i := range fileInfoList {
+		filename := fileInfoList[i].Name()
+		if strings.HasPrefix(filename, backDumpPrefix) {
+			r, err := os.Open(filename)
+			if err != nil {
+				log.Fatalf("laod file error %s ", err)
+			}
+			defer func() {
+				err = r.Close()
+			}()
+
+			SPLIT = rune('.')
+			list := strings.FieldsFunc(filename, stringSpilt)
+			if len(list) != 3 {
+				log.Printf("filename %s jump", filename)
+				continue
+			}
+
+			_bucket := list[1]
+			bloomfilterMap[_bucket], err = bloomfilter.NewOptimal(elements, percent)
+			_, err = bloomfilterMap[_bucket].ReadFrom(r)
+			if nil != err {
+				log.Fatalf("load file data error %s", err)
+			}
+			log.Printf("load file %s, bucket %s , count %d, memory %d", filename, _bucket, bloomfilterMap[_bucket].N(), bloomfilterMap[_bucket].M())
+		}
+	}
+
+}
+
+func startSaveTask() {
+	go func() {
+		for range saveTimer.C {
+			go func() {
+				for bucket, filter := range bloomfilterMap {
+					KeyCount := filter.N()
+					filename := fmt.Sprintf("%s.%s.bucket", backDumpPrefix, bucket)
+					if bloomfilterCountMap[bucket] != KeyCount {
+						filter.WriteFile(filename)
+						bloomfilterCountMap[bucket] = KeyCount
+						log.Printf(" save bucket %s", filename)
+					}
+				}
+			}()
+			saveTimer.Reset(time.Second * 2)
+		}
+	}()
 }
 
 func getErrorResult(msg string) *Result {
@@ -114,10 +176,12 @@ func initParams(response http.ResponseWriter, request *http.Request) (bool, map[
 		bodyData, _ := ioutil.ReadAll(request.Body)
 		keys = string(bodyData)
 		params[paramKey] = true
-	} else if nil != query[paramKey] || nil != request.Body {
+	}
+	if nil != query[paramKey] {
 		keys = query[paramKey][0]
 		params[paramKey] = true
-	} else {
+	}
+	if "" == keys {
 		params[paramKey] = false
 	}
 
@@ -180,7 +244,7 @@ func Load(response http.ResponseWriter, request *http.Request) {
 	if !check {
 		return
 	}
-	filename := fmt.Sprintf("BF.%s.bucket", bucket)
+	filename := fmt.Sprintf("%s.%s.bucket", backDumpPrefix, bucket)
 	r, err := os.Open(filename)
 	if err != nil {
 		responseError(response, fmt.Sprintf("back file %s not exists", filename))
@@ -190,8 +254,8 @@ func Load(response http.ResponseWriter, request *http.Request) {
 		err = r.Close()
 	}()
 
-	bloomfilterMap[bucket].ReadFrom(r)
-	responseSuccess(response, fmt.Sprintf("load from file %s success", filename))
+	count, err := bloomfilterMap[bucket].ReadFrom(r)
+	responseSuccess(response, fmt.Sprintf("load from file %s success count %d", filename, count))
 }
 
 func Save(response http.ResponseWriter, request *http.Request) {
@@ -200,9 +264,9 @@ func Save(response http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	filename := fmt.Sprintf("BF.%s.bucket", bucket)
+	filename := fmt.Sprintf("%s.%s.bucket", backDumpPrefix, bucket)
 	bloomfilterMap[bucket].WriteFile(filename)
-	responseSuccess(response, fmt.Sprintf("save to file %s success", filename))
+	responseSuccess(response, fmt.Sprintf("save to file %s success, count %d", filename, bloomfilterMap[bucket].N()))
 }
 
 func BatchAdd(response http.ResponseWriter, request *http.Request) {
@@ -216,6 +280,7 @@ func BatchAdd(response http.ResponseWriter, request *http.Request) {
 	}
 
 	count := 0
+	SPLIT = rune(',')
 	list := strings.FieldsFunc(keys, stringSpilt)
 	for _, keyString := range list {
 		if len(keyString) <= 0 {
@@ -256,6 +321,7 @@ func BatchExists(response http.ResponseWriter, request *http.Request) {
 	}
 
 	var batchList []int8
+	SPLIT = rune(',')
 	list := strings.FieldsFunc(keys, stringSpilt)
 	for _, keyString := range list {
 		if len(keyString) <= 0 {
@@ -319,5 +385,5 @@ func KeyCount(response http.ResponseWriter, request *http.Request) {
 	if !check {
 		return
 	}
-	responseSuccess(response, bloomfilterMap[bucket].K())
+	responseSuccess(response, bloomfilterMap[bucket].N())
 }

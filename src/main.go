@@ -2,8 +2,11 @@ package main
 
 import (
 	"demo"
+	"log"
 	"math/rand"
+	"strings"
 	"time"
+	"util"
 )
 
 func main() {
@@ -50,6 +53,12 @@ func main() {
 	//demo
 	//demo.ExampleClient()
 	//demo.Dump()
+
+	list := []string{}
+	for i := 0; i < 2000; i++ {
+		list = append(list, util.GetRandomName(5))
+	}
+	log.Println(strings.Join(list, ","))
 
 	demo.Main()
 }
