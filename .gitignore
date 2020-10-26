@@ -16,6 +16,8 @@ artifacts
 .buildinfo
 /cockroach*
 /certs
+/pkg
+/src/github.com
 # make stress, acceptance produce stress.test, acceptance.test
 *.test*
 *.csv
