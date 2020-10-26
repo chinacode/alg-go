@@ -4,12 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/steakknife/bloomfilter"
+	hash2 "hash"
 	"hash/fnv"
 	"io/ioutil"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -22,8 +25,8 @@ var (
 	key      = ""
 	keys     = ""
 	bucket   = ""
-	percent  = 0.0000001
-	elements = uint64(1000 * 10000)
+	percent  = 0.00001
+	elements = uint64(1 * 10000 * 10000)
 
 	backDumpPrefix      = "BF"
 	bloomfilterCountMap = map[string]uint64{}
@@ -42,6 +45,7 @@ type Result struct {
 }
 
 func Main() {
+	http.HandleFunc("/", Index)
 	http.HandleFunc("/config", Config)
 	http.HandleFunc("/add", Add)
 	http.HandleFunc("/batch_add", BatchAdd)
@@ -88,9 +92,9 @@ func loadOldData() {
 			bloomfilterMap[_bucket], err = bloomfilter.NewOptimal(elements, percent)
 			_, err = bloomfilterMap[_bucket].ReadFrom(r)
 			if nil != err {
-				log.Fatalf("load file data error %s", err)
+				log.Printf("load file data error %s", err)
 			}
-			log.Printf("load file %s, bucket %s , count %d, memory %d", filename, _bucket, bloomfilterMap[_bucket].N(), bloomfilterMap[_bucket].M())
+			log.Printf("load file %s, bucket %s , count %d, memory %d", filename, _bucket, bloomfilterMap[_bucket].K(), bloomfilterMap[_bucket].M())
 		}
 	}
 
@@ -100,17 +104,18 @@ func startSaveTask() {
 	go func() {
 		for range saveTimer.C {
 			go func() {
-				for bucket, filter := range bloomfilterMap {
-					KeyCount := filter.N()
-					filename := fmt.Sprintf("%s.%s.bucket", backDumpPrefix, bucket)
-					if bloomfilterCountMap[bucket] != KeyCount {
-						filter.WriteFile(filename)
-						bloomfilterCountMap[bucket] = KeyCount
-						log.Printf(" save bucket %s", filename)
-					}
-				}
+				//for bucket, filter := range bloomfilterMap {
+				//	KeyCount := filter.N()
+				//	filename := fmt.Sprintf("%s.%s.bucket", backDumpPrefix, bucket)
+				//	if bloomfilterCountMap[bucket] != KeyCount {
+				//		go filter.WriteFile(filename)
+				//		bloomfilterCountMap[bucket] = KeyCount
+				//		log.Printf(" save bucket %s", filename)
+				//	}
+				//}
+				runtime.GC()
 			}()
-			saveTimer.Reset(time.Second * 2)
+			saveTimer.Reset(time.Second * 5)
 		}
 	}()
 }
@@ -156,8 +161,6 @@ func initParams(response http.ResponseWriter, request *http.Request) (bool, map[
 	key = ""
 	keys = ""
 	bucket = ""
-	percent = 0.0000001
-	elements = uint64(500 * 10000)
 	params := make(map[string]bool)
 
 	query := request.URL.Query()
@@ -216,14 +219,33 @@ func initParams(response http.ResponseWriter, request *http.Request) (bool, map[
 		return false, params
 	}
 	if bloomfilterMap[bucket] == nil && !strings.Contains(request.RequestURI, "config") {
-		responseError(response, fmt.Sprintf("bucket %s not exists, please use /config init first", bucket))
-		return false, params
+		//responseError(response, fmt.Sprintf("bucket %s not exists, please use /config init first", bucket))
+		//return false, params
+		bloomfilterMap[bucket], err = bloomfilter.NewOptimal(elements, percent)
 	}
+
 	return true, params
 }
 
+func Index(response http.ResponseWriter, request *http.Request) {
+	index := `
+"/"
+"/config"
+"/add"
+"/batch_add"
+"/exists"
+"/batch_exists"
+"/clear"
+"/save"
+"/load"
+"/memory"
+"/key_count"
+	`
+	response.Write([]byte(index))
+}
+
 func Config(response http.ResponseWriter, request *http.Request) {
-	check, params := initParams(response, request)
+	check, _ := initParams(response, request)
 	if !check {
 		return
 	}
@@ -231,10 +253,10 @@ func Config(response http.ResponseWriter, request *http.Request) {
 		responseError(response, fmt.Sprintf("bucket %s exists, please reset first", bucket))
 		return
 	}
-	if !params["percent"] || !params["elements"] {
-		responseError(response, fmt.Sprintf("percent(%f) and elements(%d) must set!", percent, elements))
-		return
-	}
+	//if !params["percent"] || !params["elements"] {
+	//	responseError(response, fmt.Sprintf("percent(%f) and elements(%d) must set!", percent, elements))
+	//	return
+	//}
 	bloomfilterMap[bucket], err = bloomfilter.NewOptimal(elements, percent)
 	responseSuccess(response, fmt.Sprintf("success"))
 }
@@ -281,17 +303,56 @@ func BatchAdd(response http.ResponseWriter, request *http.Request) {
 
 	count := 0
 	SPLIT = rune(',')
+	var hash hash2.Hash64
 	list := strings.FieldsFunc(keys, stringSpilt)
 	for _, keyString := range list {
 		if len(keyString) <= 0 {
 			continue
 		}
-		hash := fnv.New64()
-		hash.Write([]byte(keyString))
+		hash = fnv.New64()
+		_, err := hash.Write([]byte(keyString))
+		if nil != err {
+			log.Printf("add key %s error %s", keyString, err)
+		}
 		bloomfilterMap[bucket].Add(hash)
 		count++
 	}
+	hash.Reset()
 	responseSuccess(response, count)
+	list = nil
+}
+
+func BatchExists(response http.ResponseWriter, request *http.Request) {
+	check, params := initParams(response, request)
+	if !check {
+		return
+	}
+	if !params["keys"] {
+		responseError(response, fmt.Sprintf("keys must set!"))
+		return
+	}
+
+	var batchList []int8
+	SPLIT = rune(',')
+	var hash hash2.Hash64
+	list := strings.FieldsFunc(keys, stringSpilt)
+	for _, keyString := range list {
+		if len(keyString) <= 0 {
+			continue
+		}
+		hash = fnv.New64()
+		hash.Write([]byte(keyString))
+		exists := bloomfilterMap[bucket].Contains(hash)
+		if exists {
+			batchList = append(batchList, 1)
+		} else {
+			batchList = append(batchList, 0)
+		}
+	}
+	list = nil
+	batchList = nil
+	hash.Reset()
+	responseSuccess(response, batchList)
 }
 
 func Add(response http.ResponseWriter, request *http.Request) {
@@ -307,36 +368,8 @@ func Add(response http.ResponseWriter, request *http.Request) {
 	hash := fnv.New64()
 	hash.Write([]byte(key))
 	bloomfilterMap[bucket].Add(hash)
+	hash.Reset()
 	responseSuccess(response, "success")
-}
-
-func BatchExists(response http.ResponseWriter, request *http.Request) {
-	check, params := initParams(response, request)
-	if !check {
-		return
-	}
-	if !params["keys"] {
-		responseError(response, fmt.Sprintf("keys must set!"))
-		return
-	}
-
-	var batchList []int8
-	SPLIT = rune(',')
-	list := strings.FieldsFunc(keys, stringSpilt)
-	for _, keyString := range list {
-		if len(keyString) <= 0 {
-			continue
-		}
-		hash := fnv.New64()
-		hash.Write([]byte(keyString))
-		exists := bloomfilterMap[bucket].Contains(hash)
-		if exists {
-			batchList = append(batchList, 1)
-		} else {
-			batchList = append(batchList, 0)
-		}
-	}
-	responseSuccess(response, batchList)
 }
 
 func Exists(response http.ResponseWriter, request *http.Request) {
@@ -358,6 +391,7 @@ func Exists(response http.ResponseWriter, request *http.Request) {
 	} else {
 		ret = 0
 	}
+	hash.Reset()
 	responseSuccess(response, ret)
 }
 
@@ -385,5 +419,6 @@ func KeyCount(response http.ResponseWriter, request *http.Request) {
 	if !check {
 		return
 	}
-	responseSuccess(response, bloomfilterMap[bucket].N())
+	filter := *bloomfilterMap[bucket]
+	responseSuccess(response, fmt.Sprintf("hit count: %d, key count: %d, memory: %d", filter.N(), filter.K(), filter.M()))
 }
