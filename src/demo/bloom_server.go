@@ -4,11 +4,11 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"github.com/cihub/seelog"
 	"github.com/steakknife/bloomfilter"
 	hash2 "hash"
 	"hash/fnv"
 	"io/ioutil"
-	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -32,6 +32,23 @@ var (
 	bloomfilterMemoryMap = map[string]int64{}
 	bloomfilterMap       = map[string]*bloomfilter.Filter{}
 
+	logLevel  = "info"
+	logConfig = `
+<seelog type="asynctimer" asyncinterval="1000000" minlevel="` + logLevel + `" maxlevel="error">
+    <outputs formatid="main">
+        <console/>
+        <splitter formatid="format1">
+            <file path="./logs/bloom_server.log"/>
+        </splitter>
+    </outputs>
+    <formats>
+        <format id="main" format="%Date(2006-1-02/3:04:05.0000) [%LEVEL] %File(%Line) - %Msg%n"/>
+        <format id="format1" format="%Date(2006-1-02/3:04:05.0000) [%LEVEL] %File(%Line) - %Msg%n"/>
+    </formats>
+</seelog>
+`
+	logger, _ = seelog.LoggerFromConfigAsString(logConfig)
+
 	serverPort = 9002
 	serverName = "bloomfilter server "
 
@@ -45,6 +62,9 @@ type Result struct {
 }
 
 func Main() {
+	seelog.ReplaceLogger(logger)
+	defer seelog.Flush()
+
 	http.HandleFunc("/", Index)
 	http.HandleFunc("/config", Config)
 	http.HandleFunc("/add", Add)
@@ -63,26 +83,27 @@ func Main() {
 
 		startSaveTask()
 	}()
-	log.Println(serverName + " start success " + strconv.Itoa(serverPort))
-	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(serverPort), nil))
+
+	logger.Info(serverName + " start success " + strconv.Itoa(serverPort))
+	logger.Info(http.ListenAndServe(":"+strconv.Itoa(serverPort), nil))
 }
 
 func loadOldData() {
 	pwd, _ := os.Getwd()
 	fileInfoList, err := ioutil.ReadDir(pwd)
 	if err != nil {
-		log.Fatal(err)
+		logger.Error(err)
 	}
 	fmt.Println(len(fileInfoList))
 	for i := range fileInfoList {
 		filename := fileInfoList[i].Name()
 		if strings.HasPrefix(filename, backDumpPrefix) {
 			start := time.Now().UnixNano()
-			log.Printf("LOAD bucket %s start %d", filename, start)
+			logger.Infof("LOAD bucket %s start %d", filename, start)
 
 			r, err := os.Open(filename)
 			if err != nil {
-				log.Fatalf("LAOD file error %s ", err)
+				logger.Errorf("LOAD file error %s ", err)
 			}
 			defer func() {
 				err = r.Close()
@@ -91,7 +112,7 @@ func loadOldData() {
 			SPLIT = rune('.')
 			list := strings.FieldsFunc(filename, stringSpilt)
 			if len(list) != 3 {
-				log.Printf("LAOD filename %s jump", filename)
+				logger.Infof("LOAD filename %s jump", filename)
 				continue
 			}
 
@@ -99,11 +120,11 @@ func loadOldData() {
 			bloomfilterMap[_bucket], err = bloomfilter.NewOptimal(elements, percent)
 			_, err = bloomfilterMap[_bucket].ReadFrom(r)
 			if nil != err {
-				log.Printf("LOAD file data error %s", err)
+				logger.Errorf("LOAD file data error %s", err)
 			}
 			//初始化
 			bloomfilterMemoryMap[_bucket] = int64(bloomfilterMap[_bucket].N())
-			log.Printf("LOAD file %s, bucket %s , count %d, num %d, memory %d, use time %d ms",
+			logger.Infof("LOAD file %s, bucket %s , count %d, num %d, memory %d, use time %d ms",
 				filename, _bucket,
 				bloomfilterMap[_bucket].K(),
 				bloomfilterMap[_bucket].N(),
@@ -118,10 +139,10 @@ func loadOldData() {
 func backupFilter(filename string, filter *bloomfilter.Filter) int64 {
 	num := int64(filter.N())
 	start := time.Now().UnixNano()
-	log.Printf("BACKUP save bucket %s start %d", filename, start)
+	logger.Infof("BACKUP save bucket %s start %d", filename, start)
 	w, err := os.Create(filename)
 	if err != nil {
-		log.Printf("BACKUP open file %s error %s", filename, err)
+		logger.Errorf("BACKUP open file %s error %s", filename, err)
 		return num
 	}
 	defer func() {
@@ -134,18 +155,18 @@ func backupFilter(filename string, filter *bloomfilter.Filter) int64 {
 	//filter.WriteFile(filename)
 	content, err := filter.MarshalBinary()
 	if nil != err {
-		log.Printf("BACKUP filter binary error %s", err)
+		logger.Errorf("BACKUP filter binary error %s", err)
 	}
-	log.Printf("BACKUP filter size %d", len(content))
+	logger.Infof("BACKUP filter size %d", len(content))
 	intN, err := rawW.Write(content)
-	log.Printf("BACKUP filter bucket %s size %d, use time %d ms", filename, intN, (time.Now().UnixNano()-start)/1000/1000)
+	logger.Infof("BACKUP filter bucket %s size %d, use time %d ms", filename, intN, (time.Now().UnixNano()-start)/1000/1000)
 	return num
 }
 
 func startSaveTask() {
 	go func() {
 		for range saveTimer.C {
-			//log.Printf("timer process ")
+			//logger.Infof("timer process ")
 			for bucket, filter := range bloomfilterMap {
 				num := int64(filter.N())
 				filename := fmt.Sprintf("%s.%s.bucket", backDumpPrefix, bucket)
@@ -187,12 +208,12 @@ func responseSuccess(response http.ResponseWriter, data interface{}) {
 	result := getResult(data)
 	json, err := json.Marshal(&result)
 	if nil != err {
-		log.Fatal(err)
+		logger.Error(err)
 	}
 	response.WriteHeader(result.Code)
 	response.Write(json)
 
-	log.Printf("<<<response %s", json)
+	logger.Debugf("<<<response %s", json)
 }
 
 func responseError(response http.ResponseWriter, msg string) {
@@ -201,7 +222,7 @@ func responseError(response http.ResponseWriter, msg string) {
 	response.WriteHeader(result.Code)
 	response.Write(json)
 
-	log.Printf("<<<response %s", json)
+	logger.Debugf("<<<response %s", json)
 }
 
 func initParams(response http.ResponseWriter, request *http.Request) (bool, map[string]bool) {
@@ -259,7 +280,7 @@ func initParams(response http.ResponseWriter, request *http.Request) (bool, map[
 		params[paramKey] = false
 	}
 
-	log.Printf(">>>request url %s , body %s", request.RequestURI, bodyData)
+	logger.Debugf(">>>request url %s , body %s", request.RequestURI, bodyData)
 	response.Header().Add("server", "bloom server")
 
 	if !strings.Contains(request.RequestURI, "config") &&
@@ -367,7 +388,7 @@ func BatchAdd(response http.ResponseWriter, request *http.Request) {
 		hash = fnv.New64()
 		_, err := hash.Write([]byte(keyString))
 		if nil != err {
-			log.Printf("add key %s error %s", keyString, err)
+			logger.Errorf("add key %s error %s", keyString, err)
 		}
 		bloomfilterMap[bucket].Add(hash)
 		count++

@@ -57,5 +57,6 @@ func main() {
 	//}
 	//log.Println(strings.Join(list, ","))
 
+	//demo.Dump()
 	demo.Main()
 }
