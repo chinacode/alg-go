@@ -13,6 +13,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -32,7 +33,7 @@ var (
 	bloomfilterMemoryMap = map[string]int64{}
 	bloomfilterMap       = map[string]*bloomfilter.Filter{}
 
-	logLevel  = "info"
+	logLevel  = "debug"
 	logConfig = `
 <seelog type="asynctimer" asyncinterval="1000000" minlevel="` + logLevel + `" maxlevel="error">
     <outputs formatid="main">
@@ -62,6 +63,7 @@ type Result struct {
 }
 
 func Main() {
+	runtime.GOMAXPROCS(2)
 	seelog.ReplaceLogger(logger)
 	defer seelog.Flush()
 
