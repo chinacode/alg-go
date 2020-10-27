@@ -63,7 +63,7 @@ type Result struct {
 }
 
 func Main() {
-	runtime.GOMAXPROCS(2)
+	runtime.GOMAXPROCS(3)
 	seelog.ReplaceLogger(logger)
 	defer seelog.Flush()
 
@@ -185,7 +185,7 @@ func startSaveTask() {
 				}
 			}
 			//runtime.GC()
-			saveTimer.Reset(time.Second * 2)
+			saveTimer.Reset(time.Second * 60)
 		}
 	}()
 }
