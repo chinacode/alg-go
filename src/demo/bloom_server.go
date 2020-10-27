@@ -1,6 +1,7 @@
 package demo
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"github.com/steakknife/bloomfilter"
@@ -12,7 +13,6 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"reflect"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -28,9 +28,9 @@ var (
 	percent  = 0.00001
 	elements = uint64(1 * 10000 * 10000)
 
-	backDumpPrefix      = "BF"
-	bloomfilterCountMap = map[string]uint64{}
-	bloomfilterMap      = map[string]*bloomfilter.Filter{}
+	backDumpPrefix       = "BF"
+	bloomfilterMemoryMap = map[string]int64{}
+	bloomfilterMap       = map[string]*bloomfilter.Filter{}
 
 	serverPort = 9002
 	serverName = "bloomfilter server "
@@ -55,10 +55,14 @@ func Main() {
 	http.HandleFunc("/save", Save)
 	http.HandleFunc("/load", Load)
 	http.HandleFunc("/memory", Memory)
+	http.HandleFunc("/buckets", Buckets)
 	http.HandleFunc("/key_count", KeyCount)
 
-	startSaveTask()
-	go loadOldData()
+	go func() {
+		loadOldData()
+
+		startSaveTask()
+	}()
 	log.Println(serverName + " start success " + strconv.Itoa(serverPort))
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(serverPort), nil))
 }
@@ -73,9 +77,12 @@ func loadOldData() {
 	for i := range fileInfoList {
 		filename := fileInfoList[i].Name()
 		if strings.HasPrefix(filename, backDumpPrefix) {
+			start := time.Now().UnixNano()
+			log.Printf("LOAD bucket %s start %d", filename, start)
+
 			r, err := os.Open(filename)
 			if err != nil {
-				log.Fatalf("laod file error %s ", err)
+				log.Fatalf("LAOD file error %s ", err)
 			}
 			defer func() {
 				err = r.Close()
@@ -84,7 +91,7 @@ func loadOldData() {
 			SPLIT = rune('.')
 			list := strings.FieldsFunc(filename, stringSpilt)
 			if len(list) != 3 {
-				log.Printf("filename %s jump", filename)
+				log.Printf("LAOD filename %s jump", filename)
 				continue
 			}
 
@@ -92,30 +99,70 @@ func loadOldData() {
 			bloomfilterMap[_bucket], err = bloomfilter.NewOptimal(elements, percent)
 			_, err = bloomfilterMap[_bucket].ReadFrom(r)
 			if nil != err {
-				log.Printf("load file data error %s", err)
+				log.Printf("LOAD file data error %s", err)
 			}
-			log.Printf("load file %s, bucket %s , count %d, memory %d", filename, _bucket, bloomfilterMap[_bucket].K(), bloomfilterMap[_bucket].M())
+			//初始化
+			bloomfilterMemoryMap[_bucket] = int64(bloomfilterMap[_bucket].N())
+			log.Printf("LOAD file %s, bucket %s , count %d, num %d, memory %d, use time %d ms",
+				filename, _bucket,
+				bloomfilterMap[_bucket].K(),
+				bloomfilterMap[_bucket].N(),
+				bloomfilterMap[_bucket].M(),
+				(time.Now().UnixNano()-start)/1000/1000,
+			)
 		}
 	}
 
 }
 
+func backupFilter(filename string, filter *bloomfilter.Filter) int64 {
+	num := int64(filter.N())
+	start := time.Now().UnixNano()
+	log.Printf("BACKUP save bucket %s start %d", filename, start)
+	w, err := os.Create(filename)
+	if err != nil {
+		log.Printf("BACKUP open file %s error %s", filename, err)
+		return num
+	}
+	defer func() {
+		err = w.Close()
+	}()
+	rawW := gzip.NewWriter(w)
+	defer func() {
+		err = rawW.Close()
+	}()
+	//filter.WriteFile(filename)
+	content, err := filter.MarshalBinary()
+	if nil != err {
+		log.Printf("BACKUP filter binary error %s", err)
+	}
+	log.Printf("BACKUP filter size %d", len(content))
+	intN, err := rawW.Write(content)
+	log.Printf("BACKUP filter bucket %s size %d, use time %d ms", filename, intN, (time.Now().UnixNano()-start)/1000/1000)
+	return num
+}
+
 func startSaveTask() {
 	go func() {
 		for range saveTimer.C {
-			go func() {
-				//for bucket, filter := range bloomfilterMap {
-				//	KeyCount := filter.N()
-				//	filename := fmt.Sprintf("%s.%s.bucket", backDumpPrefix, bucket)
-				//	if bloomfilterCountMap[bucket] != KeyCount {
-				//		go filter.WriteFile(filename)
-				//		bloomfilterCountMap[bucket] = KeyCount
-				//		log.Printf(" save bucket %s", filename)
-				//	}
-				//}
-				runtime.GC()
-			}()
-			saveTimer.Reset(time.Second * 5)
+			//log.Printf("timer process ")
+			for bucket, filter := range bloomfilterMap {
+				num := int64(filter.N())
+				filename := fmt.Sprintf("%s.%s.bucket", backDumpPrefix, bucket)
+
+				currentMemory := bloomfilterMemoryMap[bucket]
+				if currentMemory != num && currentMemory >= 0 {
+					// for repeat save
+					bloomfilterMemoryMap[bucket] = -1
+
+					//go func() {
+					num = backupFilter(filename, filter)
+					bloomfilterMemoryMap[bucket] = num
+					//}()
+				}
+			}
+			//runtime.GC()
+			saveTimer.Reset(time.Second * 2)
 		}
 	}()
 }
@@ -214,14 +261,18 @@ func initParams(response http.ResponseWriter, request *http.Request) (bool, map[
 
 	log.Printf(">>>request url %s , body %s", request.RequestURI, bodyData)
 	response.Header().Add("server", "bloom server")
-	if "" == bucket || len(bucket) <= 0 {
-		responseError(response, fmt.Sprintf("params bucket must set!"))
-		return false, params
-	}
-	if bloomfilterMap[bucket] == nil && !strings.Contains(request.RequestURI, "config") {
-		//responseError(response, fmt.Sprintf("bucket %s not exists, please use /config init first", bucket))
-		//return false, params
-		bloomfilterMap[bucket], err = bloomfilter.NewOptimal(elements, percent)
+
+	if !strings.Contains(request.RequestURI, "config") &&
+		!strings.Contains(request.RequestURI, "buckets") {
+		if "" == bucket || len(bucket) <= 0 {
+			responseError(response, fmt.Sprintf("params bucket must set!"))
+			return false, params
+		}
+		if bloomfilterMap[bucket] == nil {
+			//responseError(response, fmt.Sprintf("bucket %s not exists, please use /config init first", bucket))
+			//return false, params
+			bloomfilterMap[bucket], err = bloomfilter.NewOptimal(elements, percent)
+		}
 	}
 
 	return true, params
@@ -239,6 +290,7 @@ func Index(response http.ResponseWriter, request *http.Request) {
 "/save"
 "/load"
 "/memory"
+"/buckets"
 "/key_count"
 	`
 	response.Write([]byte(index))
@@ -286,9 +338,12 @@ func Save(response http.ResponseWriter, request *http.Request) {
 		return
 	}
 
+	start := time.Now().UnixNano()
 	filename := fmt.Sprintf("%s.%s.bucket", backDumpPrefix, bucket)
 	bloomfilterMap[bucket].WriteFile(filename)
-	responseSuccess(response, fmt.Sprintf("save to file %s success, count %d", filename, bloomfilterMap[bucket].N()))
+	useTime := (time.Now().UnixNano() - start) / 1000 / 1000
+
+	responseSuccess(response, fmt.Sprintf("save to file %s success, count %d, use time %d ms", filename, bloomfilterMap[bucket].N(), useTime))
 }
 
 func BatchAdd(response http.ResponseWriter, request *http.Request) {
@@ -349,10 +404,10 @@ func BatchExists(response http.ResponseWriter, request *http.Request) {
 			batchList = append(batchList, 0)
 		}
 	}
-	list = nil
-	batchList = nil
 	hash.Reset()
 	responseSuccess(response, batchList)
+	list = nil
+	batchList = nil
 }
 
 func Add(response http.ResponseWriter, request *http.Request) {
@@ -421,4 +476,16 @@ func KeyCount(response http.ResponseWriter, request *http.Request) {
 	}
 	filter := *bloomfilterMap[bucket]
 	responseSuccess(response, fmt.Sprintf("hit count: %d, key count: %d, memory: %d", filter.N(), filter.K(), filter.M()))
+}
+
+func Buckets(response http.ResponseWriter, request *http.Request) {
+	check, _ := initParams(response, request)
+	if !check {
+		return
+	}
+	var buckets []string
+	for k, _ := range bloomfilterMap {
+		buckets = append(buckets, k)
+	}
+	responseSuccess(response, strings.Join(buckets, ","))
 }

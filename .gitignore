@@ -21,6 +21,7 @@ artifacts
 # make stress, acceptance produce stress.test, acceptance.test
 *.test*
 *.csv
+*.bucket
 # Custom or private env vars (e.g. internal keys, access tokens, etc).
 
 # Generated files containing include paths.
