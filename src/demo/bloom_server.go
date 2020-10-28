@@ -63,7 +63,7 @@ type Result struct {
 }
 
 func Main() {
-	runtime.GOMAXPROCS(3)
+	runtime.GOMAXPROCS(2)
 	seelog.ReplaceLogger(logger)
 	defer seelog.Flush()
 
