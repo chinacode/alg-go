@@ -344,6 +344,14 @@ func getEmailNames(nameList []string) []string {
 	return []string{strings.Join(nameList, ""), strings.Join(nameList, ".")}
 }
 
+func stringSum(username string) uint64 {
+	sum := uint64(0)
+	for _, v := range username {
+		sum += uint64(v)
+	}
+	return sum
+}
+
 func isMixing(username string) bool {
 	n, l := countNumberLetter(username)
 	value, _ := decimal.NewFromFloat(float64(n)).Div(decimal.NewFromFloat(float64(l + n))).Float64()
@@ -467,7 +475,6 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 			//log.Printf("%s %s", username, emailName)
 			for _, emailName := range emailNames {
 				tmpEmails = append(tmpEmails, emailName)
-				tmpEmails = append(tmpEmails, username.username)
 				for _, prefix := range prefixList {
 					email := fmt.Sprintf("%s@%s", emailName, prefix)
 
@@ -482,6 +489,11 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 					bloomInstance.Add(hash)
 				}
 			}
+			//add empty dot email
+			if len(emailNames) == 1 {
+				tmpEmails = append(tmpEmails, "")
+			}
+			tmpEmails = append(tmpEmails, username.username)
 			allData = append(allData, tmpEmails)
 		}
 	}
@@ -678,6 +690,9 @@ func Dump() {
 		"method[2] host port user password dbName status[0:all] limit debug[optional default 0]\n" +
 		"method[3] host port user password dbName indexFile importFile debug[optional default 0]"
 	args := os.Args
+
+	println(stringSum("✦-marla-mckenna-✦-author-speaker-graphic-designer-editor-15a87015") % 108)
+
 	if len(args) != 8 && len(args) != 9 && len(args) != 10 && len(args) != 7 {
 		log.Println(args)
 		log.Println(readme)
