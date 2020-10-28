@@ -23,11 +23,13 @@ var (
 	//_maxElements         = uint64(500 * 10000)
 	//_probCollide         = 0.0000001
 
-	key      = ""
-	keys     = ""
-	bucket   = ""
-	percent  = 0.00001
-	elements = uint64(1 * 10000 * 10000)
+	key          = ""
+	keys         = ""
+	bucket       = ""
+	bucketBuffer = ""
+	forceAdd     = uint64(0)
+	percent      = 0.00001
+	elements     = uint64(1 * 10000 * 10000)
 
 	backDumpPrefix       = "BF"
 	bloomfilterMemoryMap = map[string]int64{}
@@ -231,8 +233,12 @@ func initParams(response http.ResponseWriter, request *http.Request) (bool, map[
 	key = ""
 	keys = ""
 	bucket = ""
-	params := make(map[string]bool)
+	bucketBuffer = ""
+	forceAdd = uint64(0)
+	percent = 0.00001
+	elements = uint64(1 * 10000 * 10000)
 
+	params := make(map[string]bool)
 	query := request.URL.Query()
 
 	paramKey := "key"
@@ -261,6 +267,7 @@ func initParams(response http.ResponseWriter, request *http.Request) (bool, map[
 	paramKey = "bucket"
 	if nil != query[paramKey] {
 		bucket = query[paramKey][0]
+		bucketBuffer = bucket + ".BUFFER"
 		params[paramKey] = true
 	} else {
 		params[paramKey] = false
@@ -276,7 +283,15 @@ func initParams(response http.ResponseWriter, request *http.Request) (bool, map[
 
 	paramKey = "elements"
 	if nil != query[paramKey] {
-		elements, _ = strconv.ParseUint(query["elements"][0], 10, 64)
+		elements, _ = strconv.ParseUint(query[paramKey][0], 10, 64)
+		params[paramKey] = true
+	} else {
+		params[paramKey] = false
+	}
+
+	paramKey = "forceAdd"
+	if nil != query[paramKey] {
+		forceAdd, _ = strconv.ParseUint(query[paramKey][0], 10, 64)
 		params[paramKey] = true
 	} else {
 		params[paramKey] = false
@@ -425,6 +440,10 @@ func BatchExists(response http.ResponseWriter, request *http.Request) {
 			batchList = append(batchList, 1)
 		} else {
 			batchList = append(batchList, 0)
+			//exists and add key
+			if forceAdd == 1 {
+				bloomfilterMap[bucket].Add(hash)
+			}
 		}
 	}
 	hash.Reset()

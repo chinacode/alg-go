@@ -59,6 +59,7 @@ var (
 	statPrefixMap = make(map[string]int64)
 
 	repeatCount        = 0
+	repeatList         []string
 	bloomInstance, err = bloomfilter.NewOptimal(maxElements, probCollide) //check repeat email
 )
 
@@ -134,6 +135,9 @@ func generateEmail(emailName string, emailPrefix string, prefixMap map[uint]Emai
 		hash.Write([]byte(email))
 		if bloomInstance.Contains(hash) {
 			repeatCount++
+			if DEBUG && len(repeatList) <= 10 {
+				repeatList = append(repeatList, email)
+			}
 			continue
 		}
 		emails := []string{email}
@@ -147,6 +151,7 @@ func generateEmail(emailName string, emailPrefix string, prefixMap map[uint]Emai
 
 		bloomInstance.Add(hash)
 	}
+
 	return apiData, scriptData, emailCount
 }
 
@@ -251,6 +256,9 @@ func dumpEmail(host string, port string, user string, password string, dbName st
 		}
 	}
 
+	if len(repeatList) > 0 {
+		log.Printf("repeat list samples %s", repeatList)
+	}
 	log.Printf("statistics time (%s~%s) total:%d, api:%d, script:%d, noDot:%d, dot:%d, repeat %d", start, end, total, ac, sc, noDotCount, dotCount, repeatCount)
 	log.Printf("dump used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
 }
