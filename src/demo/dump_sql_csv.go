@@ -11,7 +11,10 @@ import (
 	"github.com/steakknife/bloomfilter"
 	"hash/fnv"
 	"io"
+	"io/ioutil"
 	"log"
+	"math"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -374,9 +377,10 @@ func getEmailName(username string) []string {
 	if !isLetterAndNumber(username) || len(username) <= 3 {
 		return emails
 	}
+	SPLIT = rune('-')
 	splitList := strings.FieldsFunc(username, stringSpilt)
 	if len(splitList) == 1 {
-		if len(splitList[0]) > 23 || isMixing(splitList[0]) {
+		if len(splitList[0]) > 23 || len(splitList[0]) < 5 || isMixing(splitList[0]) {
 			return emails
 		}
 		return getEmailNames(splitList)
@@ -401,7 +405,6 @@ func getEmailName(username string) []string {
 }
 
 func dumpUnValidEmail(host string, port string, user string, password string, dbName string, status string, limit string) {
-	SPLIT = rune('-')
 	startTime := time.Now().UnixNano()
 	log.Printf("dump start %s", time.Now().String())
 	dbUser := flag.String("user", user, "database user")
@@ -464,6 +467,7 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 			//log.Printf("%s %s", username, emailName)
 			for _, emailName := range emailNames {
 				tmpEmails = append(tmpEmails, emailName)
+				tmpEmails = append(tmpEmails, username.username)
 				for _, prefix := range prefixList {
 					email := fmt.Sprintf("%s@%s", emailName, prefix)
 
@@ -491,7 +495,6 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 }
 
 func importEmail(host string, port string, user string, password string, dbName string, indexFile string, importFile string) {
-	SPLIT = rune('@')
 	startTime := time.Now().UnixNano()
 	log.Printf("dump start %s", time.Now().String())
 	dbUser := flag.String("user", user, "database user")
@@ -516,13 +519,15 @@ func importEmail(host string, port string, user string, password string, dbName 
 		prefixIdMap[v.email_prefix] = k
 	}
 
+	namesRepeatCount := 0
 	updateTime := time.Now().Unix()
 	indexList := readCsv(indexFile)
 	namesMap := make(map[string][]string)
 	for _, indexEmail := range indexList {
 		key := strings.TrimSpace(indexEmail[2])
 		if nil != namesMap[key] {
-			log.Println(indexEmail)
+			//log.Println(indexEmail)
+			namesRepeatCount++
 		}
 		id := indexEmail[1]
 		index := indexEmail[0]
@@ -532,73 +537,116 @@ func importEmail(host string, port string, user string, password string, dbName 
 		namesMap[key] = []string{index, id}
 	}
 
+	type CheckData struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+		Data string `json:"data"`
+	}
+
 	failCount := 0
 	successCount := 0
 	emailName := ""
 	var emailData EmailData
-	tx, _ := db.Begin()
 	importList := readCsv(importFile)
-	for _, importEmail := range importList {
-		emails := strings.FieldsFunc(importEmail[0], stringSpilt)
-		if "" == emailName {
-			emailName = emails[0]
+
+	//depart data
+	pageSize := 1000
+	_page, _ := decimal.NewFromInt(int64(len(importList))).Div(decimal.NewFromInt(int64(pageSize))).Float64()
+	pageCount := int(math.Ceil(_page))
+	for page := 0; page < pageCount; page++ {
+		var pageList [][]string
+		start := page * pageSize
+		end := (page + 1) * pageSize
+		if end > len(importList) {
+			end = len(importList)
+		}
+		pageList = importList[start:end]
+
+		log.Printf("start %d, end %d", start, end)
+		var emailList []string
+		for _, email := range pageList {
+			emailList = append(emailList, email[0])
+		}
+		response, _ := http.Post("http://192.168.1.200:9002/batch_exists?bucket=email", "application/x-www-form-urlencoded", strings.NewReader(strings.Join(emailList, ",")))
+		jsonData, _ := ioutil.ReadAll(response.Body)
+		var checkData CheckData
+		err := json.Unmarshal(jsonData, &checkData)
+		if nil != err {
+			log.Printf("decode check json fail %s", err)
+		}
+		var checkList []int8
+		err = json.Unmarshal([]byte(checkData.Data), &checkList)
+		if nil != err {
+			log.Printf("decode check json fail %s", err)
 		}
 
-		prefix := prefixIdMap[emails[1]]
-		if strings.Contains(emails[0], ".") {
-			emailData.email_name2 = emails[0]
-			emailData.email_prefix2 = append(emailData.email_prefix2, prefix)
-			//replace .
-			emails[0] = strings.Replace(emails[0], ".", "", len(emails[0]))
-		} else {
-			emailData.email_name = emails[0]
-			emailData.email_prefix = append(emailData.email_prefix, prefix)
-		}
-		if emailName != emails[0] {
-			//log.Println(emailName)
-			//emailName = "hambali"
-			//log.Println(emailName, namesMap["hambali"])
-			namesIndex := namesMap[emailName]
-			if nil == namesIndex {
-				emailData = EmailData{}
-				emailName = emails[0]
+		tx, _ := db.Begin()
+		for index, email := range emailList {
+			if checkList[index] == 1 {
 				continue
 			}
-			id := namesIndex[1]
-			tableIndex := namesIndex[0]
-			prefixJson, _ := json.Marshal(emailData.email_prefix)
-			prefix2Json, _ := json.Marshal(emailData.email_prefix2)
-			prefix2JsonStr := string(prefix2Json)
-			if prefix2JsonStr == "null" {
-				prefix2JsonStr = "[]"
+			SPLIT = rune('@')
+			emails := strings.FieldsFunc(email, stringSpilt)
+			if "" == emailName {
+				emailName = emails[0]
 			}
 
-			sql := fmt.Sprintf(
-				"update likedin_usernames_%s set finished = 1,email_name = '%s', email_prefix = '%s',email_name2 = '%s', email_prefix2 = '%s',update_time = %d where id = %s limit 1",
-				tableIndex, emailData.email_name, string(prefixJson), emailData.email_name2, prefix2JsonStr, updateTime, id)
-			if DEBUG {
-				log.Println(sql)
+			prefix := prefixIdMap[emails[1]]
+			if strings.Contains(emails[0], ".") {
+				emailData.email_name2 = emails[0]
+				emailData.email_prefix2 = append(emailData.email_prefix2, prefix)
+				//replace .
+				emails[0] = strings.Replace(emails[0], ".", "", len(emails[0]))
+			} else {
+				emailData.email_name = emails[0]
+				emailData.email_prefix = append(emailData.email_prefix, prefix)
 			}
+			if emailName != emails[0] {
+				//log.Println(emailName)
+				//emailName = "hambali"
+				//log.Println(emailName, namesMap["hambali"])
+				namesIndex := namesMap[emailName]
+				if nil == namesIndex {
+					emailData = EmailData{}
+					emailName = emails[0]
+					continue
+				}
+				id := namesIndex[1]
+				tableIndex := namesIndex[0]
+				prefixJson, _ := json.Marshal(emailData.email_prefix)
+				prefix2Json, _ := json.Marshal(emailData.email_prefix2)
+				prefix2JsonStr := string(prefix2Json)
+				if prefix2JsonStr == "null" {
+					prefix2JsonStr = "[]"
+				}
 
-			//_, err := db.Exec(sql)
-			_, err := tx.Exec(sql)
-			if nil != err {
-				log.Fatalln(err)
+				sql := fmt.Sprintf(
+					"update likedin_usernames_%s set finished = 1,email_name = '%s', email_prefix = '%s',email_name2 = '%s', email_prefix2 = '%s',update_time = %d where id = %s limit 1",
+					tableIndex, emailData.email_name, string(prefixJson), emailData.email_name2, prefix2JsonStr, updateTime, id)
+				if DEBUG {
+					log.Println(sql)
+				}
+
+				//_, err := db.Exec(sql)
+				_, err := tx.Exec(sql)
+				if nil != err {
+					log.Fatalln(err)
+				}
+
+				//count, err := ret.RowsAffected()
+				successCount++
+
+				//reset
+				emailData = EmailData{}
+				emailName = emails[0]
+				//reset names Map for finish fail
+				namesMap[emailName] = nil
 			}
-
-			//count, err := ret.RowsAffected()
-			successCount++
-
-			//reset
-			emailData = EmailData{}
-			emailName = emails[0]
-			//reset names Map for finish fail
-			namesMap[emailName] = nil
 		}
+		tx.Commit()
 	}
-	tx.Commit()
 
-	tx, _ = db.Begin()
+	tx, _ := db.Begin()
 	for _, v := range namesMap {
 		if nil == v {
 			//ok data
@@ -620,7 +668,7 @@ func importEmail(host string, port string, user string, password string, dbName 
 	}
 	tx.Commit()
 
-	log.Printf("statstics success %d, fail %d ", successCount, failCount)
+	log.Printf("statstics success %d, fail %d , names repeat: %d", successCount, failCount, namesRepeatCount)
 	log.Printf("import used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
 }
 
