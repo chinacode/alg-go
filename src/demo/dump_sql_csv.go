@@ -506,6 +506,35 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 	log.Printf("dump used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
 }
 
+type CheckData struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Data string `json:"data"`
+}
+
+func bloomRequest(url string, emailList []string) []int8 {
+	response, _ := http.Post(url, "application/x-www-form-urlencoded", strings.NewReader(strings.Join(emailList, ",")))
+	jsonData, _ := ioutil.ReadAll(response.Body)
+	var checkData CheckData
+	err := json.Unmarshal(jsonData, &checkData)
+	if nil != err {
+		log.Printf("decode check json fail %s", err)
+	}
+	var checkList []int8
+
+	if len(checkData.Data) <= 11 {
+		count, _ := strconv.ParseInt(checkData.Data, 10, 64)
+		checkList = append(checkList, int8(count))
+		return checkList
+	}
+
+	err = json.Unmarshal([]byte(checkData.Data), &checkList)
+	if nil != err {
+		log.Printf("decode check json fail %s", err)
+	}
+	return checkList
+}
+
 func importEmail(host string, port string, user string, password string, dbName string, indexFile string, importFile string) {
 	startTime := time.Now().UnixNano()
 	log.Printf("dump start %s", time.Now().String())
@@ -549,12 +578,6 @@ func importEmail(host string, port string, user string, password string, dbName 
 		namesMap[key] = []string{index, id}
 	}
 
-	type CheckData struct {
-		Code int    `json:"code"`
-		Msg  string `json:"msg"`
-		Data string `json:"data"`
-	}
-
 	failCount := 0
 	successCount := 0
 	emailName := ""
@@ -579,18 +602,8 @@ func importEmail(host string, port string, user string, password string, dbName 
 		for _, email := range pageList {
 			emailList = append(emailList, email[0])
 		}
-		response, _ := http.Post("http://192.168.1.200:9002/batch_exists?bucket=email", "application/x-www-form-urlencoded", strings.NewReader(strings.Join(emailList, ",")))
-		jsonData, _ := ioutil.ReadAll(response.Body)
-		var checkData CheckData
-		err := json.Unmarshal(jsonData, &checkData)
-		if nil != err {
-			log.Printf("decode check json fail %s", err)
-		}
-		var checkList []int8
-		err = json.Unmarshal([]byte(checkData.Data), &checkList)
-		if nil != err {
-			log.Printf("decode check json fail %s", err)
-		}
+
+		checkList := bloomRequest("http://192.168.1.200:9002/batch_exists?bucket=email_ok", emailList)
 
 		tx, _ := db.Begin()
 		for index, email := range emailList {
@@ -635,9 +648,9 @@ func importEmail(host string, port string, user string, password string, dbName 
 				sql := fmt.Sprintf(
 					"update likedin_usernames_%s set finished = 1,email_name = '%s', email_prefix = '%s',email_name2 = '%s', email_prefix2 = '%s',update_time = %d where id = %s limit 1",
 					tableIndex, emailData.email_name, string(prefixJson), emailData.email_name2, prefix2JsonStr, updateTime, id)
-				if DEBUG {
-					log.Println(sql)
-				}
+				//if DEBUG {
+				//	log.Println(sql)
+				//}
 
 				//_, err := db.Exec(sql)
 				_, err := tx.Exec(sql)
@@ -656,29 +669,33 @@ func importEmail(host string, port string, user string, password string, dbName 
 			}
 		}
 		tx.Commit()
+
+		//set bloom filter server
+		bloomRequest("http://192.168.1.200:9002/batch_add?bucket=email_ok", emailList)
 	}
 
-	tx, _ := db.Begin()
-	for _, v := range namesMap {
-		if nil == v {
-			//ok data
-			continue
-		}
-		id := v[1]
-		tableIndex := v[0]
-		sql := fmt.Sprintf("update likedin_usernames_%s set finished = 1,update_time = %d where id = %s limit 1", tableIndex, updateTime, id)
-		if DEBUG {
-			log.Println(sql)
-		}
-		//_, err := db.Exec(sql)
-		_, err := tx.Exec(sql)
-		if nil != err {
-			log.Fatalln(err)
-		}
-		//count, err := ret.RowsAffected()
-		failCount++
-	}
-	tx.Commit()
+	////set un finish data
+	//tx, _ := db.Begin()
+	//for _, v := range namesMap {
+	//	if nil == v {
+	//		//ok data
+	//		continue
+	//	}
+	//	id := v[1]
+	//	tableIndex := v[0]
+	//	sql := fmt.Sprintf("update likedin_usernames_%s set finished = 1,update_time = %d where id = %s limit 1", tableIndex, updateTime, id)
+	//	if DEBUG {
+	//		log.Println(sql)
+	//	}
+	//	//_, err := db.Exec(sql)
+	//	_, err := tx.Exec(sql)
+	//	if nil != err {
+	//		log.Fatalln(err)
+	//	}
+	//	//count, err := ret.RowsAffected()
+	//	failCount++
+	//}
+	//tx.Commit()
 
 	log.Printf("statstics success %d, fail %d , names repeat: %d", successCount, failCount, namesRepeatCount)
 	log.Printf("import used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
@@ -690,9 +707,7 @@ func Dump() {
 		"method[2] host port user password dbName status[0:all] limit debug[optional default 0]\n" +
 		"method[3] host port user password dbName indexFile importFile debug[optional default 0]"
 	args := os.Args
-
-	println(stringSum("✦-marla-mckenna-✦-author-speaker-graphic-designer-editor-15a87015") % 108)
-
+	//println(stringSum("✦-marla-mckenna-✦-author-speaker-graphic-designer-editor-15a87015") % 108)
 	if len(args) != 8 && len(args) != 9 && len(args) != 10 && len(args) != 7 {
 		log.Println(args)
 		log.Println(readme)

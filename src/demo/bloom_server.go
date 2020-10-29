@@ -1,13 +1,14 @@
 package demo
 
 import (
-	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"github.com/cihub/seelog"
+	"github.com/pierrec/lz4"
 	"github.com/steakknife/bloomfilter"
 	hash2 "hash"
 	"hash/fnv"
+	"io"
 	"io/ioutil"
 	"net/http"
 	_ "net/http/pprof"
@@ -62,6 +63,44 @@ type Result struct {
 	Code int         `json:"code"`
 	Msg  string      `json:"msg"`
 	Data interface{} `json:"data"`
+}
+
+type Zip struct {
+	filename string
+	filter *bloomfilter.Filter
+}
+
+func (z *Zip) write() (n int64, err error) {
+	num := int64(z.filter.N())
+	start := time.Now().UnixNano()
+	logger.Infof("BACKUP save bucket %s start %d", z.filename, start)
+	w, err := os.Create(z.filename)
+	if err != nil {
+		logger.Errorf("BACKUP open file %s error %s", z.filename, err)
+		return num, nil
+	}
+	defer func() {
+		err = w.Close()
+	}()
+
+	rawW := lz4.NewWriter(w)
+	defer func() {
+		err = rawW.Close()
+	}()
+	content, err := z.filter.MarshalBinary()
+	if nil != err {
+		logger.Errorf("BACKUP filter binary error %s", err)
+		return -1, err
+	}
+	logger.Infof("BACKUP filter size %d", len(content))
+	intN, err := rawW.Write(content)
+	logger.Infof("BACKUP filter bucket %s size %d, use time %d ms", z.filename, intN, (time.Now().UnixNano()-start)/1000/1000)
+
+	return num, err
+}
+
+func (z *Zip) load() (n int, err error) {
+
 }
 
 func Main() {
@@ -135,9 +174,9 @@ func loadOldData() {
 				bloomfilterMap[_bucket].M(),
 				(time.Now().UnixNano()-start)/1000/1000,
 			)
+			runtime.GC()
 		}
 	}
-
 }
 
 func backupFilter(filename string, filter *bloomfilter.Filter) int64 {
@@ -152,7 +191,11 @@ func backupFilter(filename string, filter *bloomfilter.Filter) int64 {
 	defer func() {
 		err = w.Close()
 	}()
-	rawW := gzip.NewWriter(w)
+	//rawW := gzip.NewWriter(w)
+	//defer func() {
+	//	err = rawW.Close()
+	//}()
+	rawW := lz4.NewWriter(w)
 	defer func() {
 		err = rawW.Close()
 	}()
@@ -163,6 +206,7 @@ func backupFilter(filename string, filter *bloomfilter.Filter) int64 {
 	}
 	logger.Infof("BACKUP filter size %d", len(content))
 	intN, err := rawW.Write(content)
+
 	logger.Infof("BACKUP filter bucket %s size %d, use time %d ms", filename, intN, (time.Now().UnixNano()-start)/1000/1000)
 	return num
 }
@@ -186,7 +230,7 @@ func startSaveTask() {
 					//}()
 				}
 			}
-			//runtime.GC()
+			runtime.GC()
 			saveTimer.Reset(time.Second * 60)
 		}
 	}()
