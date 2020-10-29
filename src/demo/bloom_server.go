@@ -1,6 +1,7 @@
 package demo
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"github.com/cihub/seelog"
@@ -8,7 +9,6 @@ import (
 	"github.com/steakknife/bloomfilter"
 	hash2 "hash"
 	"hash/fnv"
-	"io"
 	"io/ioutil"
 	"net/http"
 	_ "net/http/pprof"
@@ -67,7 +67,7 @@ type Result struct {
 
 type Zip struct {
 	filename string
-	filter *bloomfilter.Filter
+	filter   *bloomfilter.Filter
 }
 
 func (z *Zip) write() (n int64, err error) {
@@ -83,7 +83,8 @@ func (z *Zip) write() (n int64, err error) {
 		err = w.Close()
 	}()
 
-	rawW := lz4.NewWriter(w)
+	//rawW := lz4.NewWriter(w)
+	rawW := gzip.NewWriter(w)
 	defer func() {
 		err = rawW.Close()
 	}()
@@ -97,10 +98,6 @@ func (z *Zip) write() (n int64, err error) {
 	logger.Infof("BACKUP filter bucket %s size %d, use time %d ms", z.filename, intN, (time.Now().UnixNano()-start)/1000/1000)
 
 	return num, err
-}
-
-func (z *Zip) load() (n int, err error) {
-
 }
 
 func Main() {
@@ -224,10 +221,18 @@ func startSaveTask() {
 					// for repeat save
 					bloomfilterMemoryMap[bucket] = -1
 
-					//go func() {
+					////this way will lock then bloom server stop the world
+					//num, err = filter.WriteFile(filename)
+					//if nil != err {
+					//	logger.Errorf("save file %s fail", filename)
+					//}
+
+					////this way use lz4 zip algorithm speed is the best, size will bigger 50%
+					//zip := Zip{filename: filename, filter: filter}
+					//num, _ = zip.write()
+
 					num = backupFilter(filename, filter)
 					bloomfilterMemoryMap[bucket] = num
-					//}()
 				}
 			}
 			runtime.GC()

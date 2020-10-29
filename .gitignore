@@ -18,6 +18,8 @@ artifacts
 /certs
 /pkg
 /src/github.com
+
+/logs/
 # make stress, acceptance produce stress.test, acceptance.test
 *.test*
 *.csv
