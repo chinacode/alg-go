@@ -419,7 +419,11 @@ func getEmailName(username string) []string {
 	return getEmailNames(letterList)
 }
 
-func dumpUnValidEmail(host string, port string, user string, password string, dbName string, status string, limit string) {
+func dumpUnValidEmailApi(mysql MysqlServer, status string, limit string) ([][]string, [][]string) {
+	return dumpUnValidEmail(mysql.host, strconv.Itoa(mysql.port), mysql.user, mysql.password, mysql.database, status, limit, false)
+}
+
+func dumpUnValidEmail(host string, port string, user string, password string, dbName string, status string, limit string, writeFile bool) ([][]string, [][]string) {
 	startTime := time.Now().UnixNano()
 	log.Printf("dump start %s", time.Now().String())
 	dbUser := flag.String("user", user, "database user")
@@ -506,11 +510,16 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 	}
 
 	name := fmt.Sprintf("dump_email_checker_(%s).csv", limit)
-	write(name, emailData)
-	name = fmt.Sprintf("dump_email_import_(%s).csv", limit)
-	write(name, allData)
+	if writeFile {
+		write(name, emailData)
+
+		name = fmt.Sprintf("dump_email_import_(%s).csv", limit)
+		write(name, allData)
+	}
+
 	log.Printf("name: %s, user count: %d, email count:%d, repeat %d", name, len(allData), len(emailData), repeatCount)
 	log.Printf("dump used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
+	return allData, emailData
 }
 
 func bloomRequest(url string, emailList []string) []int8 {
@@ -534,6 +543,10 @@ func bloomRequest(url string, emailList []string) []int8 {
 		log.Printf("decode check json fail %s", err)
 	}
 	return checkList
+}
+
+func importEmailApi(mysql MysqlServer, indexFile string, importFile string) {
+	importEmail(mysql.host, strconv.Itoa(mysql.port), mysql.user, mysql.password, mysql.database, indexFile, importFile)
 }
 
 func importEmail(host string, port string, user string, password string, dbName string, indexFile string, importFile string) {
@@ -605,7 +618,7 @@ func importEmail(host string, port string, user string, password string, dbName 
 			emailList = append(emailList, email[0])
 		}
 
-		checkList := bloomRequest("http://192.168.1.200:9002/batch_exists?bucket=email_ok", emailList)
+		checkList := bloomRequest("http://"+config.bloom.host+":"+strconv.Itoa(config.bloom.port)+"/batch_exists?bucket=email_ok", emailList)
 		for index, email := range emailList {
 			if checkList[index] == 1 {
 				emailRepeatCount++
@@ -644,7 +657,7 @@ func importEmail(host string, port string, user string, password string, dbName 
 			}
 		}
 		//set bloom filter server
-		bloomRequest("http://192.168.1.200:9002/batch_add?bucket=email_ok", emailList)
+		bloomRequest("http://"+config.bloom.host+":"+strconv.Itoa(config.bloom.port)+"/batch_add?bucket=email_ok", emailList)
 	}
 
 	log.Println("import data to database ")
@@ -660,7 +673,7 @@ func importEmail(host string, port string, user string, password string, dbName 
 		}
 
 		sql := fmt.Sprintf(
-			"update likedin_usernames_%s set finished = 1,email_name = '%s', email_prefix = '%s',email_name2 = '%s', email_prefix2 = '%s',update_time = %d where id = %s limit 1",
+			"update likedin_usernames_%s set finished = 2,email_name = '%s', email_prefix = '%s',email_name2 = '%s', email_prefix2 = '%s',update_time = %d where id = %s limit 1",
 			tableIndex, emailData.email_name, string(prefixJson), emailData.email_name2, prefix2JsonStr, updateTime, id)
 		//if DEBUG {
 		//	log.Println(sql)
@@ -743,7 +756,7 @@ func Dump() {
 		//println(isMixing("5a50a6162"))
 		//println(isMixing("411884187"))
 		//println(isMixing("a18b61117"))
-		dumpUnValidEmail(args[2], args[3], args[4], args[5], args[6], args[7], args[8])
+		dumpUnValidEmail(args[2], args[3], args[4], args[5], args[6], args[7], args[8], true)
 	} else if args[1] == "3" {
 		if len(args) == 9 {
 			args = append(args, "0")
@@ -757,6 +770,4 @@ func Dump() {
 	} else {
 		log.Println(readme)
 	}
-	//for test
-	//demo.DumpEmail("192.168.1.200", 3306, "root", "Paramida@2019", "brandu_crawl", "", "")
 }

@@ -106,7 +106,7 @@ func Main() {
 	defer seelog.Flush()
 
 	http.HandleFunc("/", Index)
-	http.HandleFunc("/config", Config)
+	http.HandleFunc("/config", SetConfig)
 	http.HandleFunc("/add", Add)
 	http.HandleFunc("/batch_add", BatchAdd)
 	http.HandleFunc("/exists", Exists)
@@ -117,6 +117,7 @@ func Main() {
 	http.HandleFunc("/memory", Memory)
 	http.HandleFunc("/buckets", Buckets)
 	http.HandleFunc("/key_count", KeyCount)
+	http.HandleFunc("/dump_email_zip", dumpEmailZip)
 
 	go func() {
 		loadOldData()
@@ -383,7 +384,7 @@ func Index(response http.ResponseWriter, request *http.Request) {
 	response.Write([]byte(index))
 }
 
-func Config(response http.ResponseWriter, request *http.Request) {
+func SetConfig(response http.ResponseWriter, request *http.Request) {
 	check, _ := initParams(response, request)
 	if !check {
 		return
@@ -578,5 +579,24 @@ func Buckets(response http.ResponseWriter, request *http.Request) {
 	for k, _ := range bloomfilterMap {
 		buckets = append(buckets, k)
 	}
+	responseSuccess(response, strings.Join(buckets, ","))
+}
+
+func dumpEmailZip(response http.ResponseWriter, request *http.Request) {
+	check, _ := initParams(response, request)
+	if !check {
+		return
+	}
+	query := request.URL.Query()
+	limit := query["limit"][0]
+	if "" == limit {
+		limit = "100"
+	}
+	departs := query["departs"][0]
+	if "" == departs {
+		departs = "3"
+	}
+	dumpUnValidEmailApi(config.mysql, "1", limit)
+
 	responseSuccess(response, strings.Join(buckets, ","))
 }
