@@ -598,5 +598,5 @@ func dumpEmailZip(response http.ResponseWriter, request *http.Request) {
 	}
 	dumpUnValidEmailApi(config.mysql, "1", limit)
 
-	responseSuccess(response, strings.Join(buckets, ","))
+	//responseSuccess(response, strings.Join(buckets, ","))
 }
