@@ -118,6 +118,7 @@ func Main() {
 	http.HandleFunc("/buckets", Buckets)
 	http.HandleFunc("/key_count", KeyCount)
 	http.HandleFunc("/dump_email_zip", dumpEmailZip)
+	http.HandleFunc("/get_email_count", getEmailCount)
 
 	go func() {
 		loadOldData()
@@ -597,6 +598,42 @@ func dumpEmailZip(response http.ResponseWriter, request *http.Request) {
 		departs = "3"
 	}
 	dumpUnValidEmailApi(config.mysql, "1", limit)
-
 	//responseSuccess(response, strings.Join(buckets, ","))
+}
+
+func getEmailCount(response http.ResponseWriter, request *http.Request) {
+	//check, _ := initParams(response, request)
+	//if !check {
+	//	return
+	//}
+	query := request.URL.Query()
+
+	if nil == query["finished"] || nil == query["start"] || nil == query["end"] {
+		responseError(response, "finished start(2020-11-01) end(2020-11-01) must set")
+		return
+	}
+
+	finished, _ := strconv.ParseInt(query["finished"][0], 10, 64)
+	start := query["start"][0]
+	end := query["end"][0]
+
+	var _start time.Time
+	var _end time.Time
+	if "" != start {
+		var err error
+		_start, err = time.ParseInLocation(timeTemplate, start, time.Local)
+		if nil != err {
+			_start, err = time.ParseInLocation(dateTemplate, start, time.Local)
+		}
+	}
+	if "" != end {
+		var err error
+		_end, err = time.ParseInLocation(timeTemplate, end, time.Local)
+		if nil != err {
+			_end, err = time.ParseInLocation(dateTemplate, end, time.Local)
+		}
+	}
+
+	count := GetEmailCount(config.mysql, int(finished), _start.Unix(), _end.Unix())
+	responseSuccess(response, count)
 }

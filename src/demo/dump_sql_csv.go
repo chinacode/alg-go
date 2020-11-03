@@ -522,6 +522,56 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 	return allData, emailData
 }
 
+func GetEmailCount(mysql MysqlServer, finished int, start int64, end int64) int {
+	startTime := time.Now().UnixNano()
+	log.Printf("dump start %s", time.Now().String())
+
+	count := 0
+	dbUrl := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", mysql.user, mysql.password, mysql.host, mysql.port, mysql.database)
+	if DEBUG {
+		log.Println(dbUrl)
+	}
+	db, err := sql.Open("mysql", dbUrl)
+	if err != nil {
+		log.Fatalf("Could not connect to server: %s\n", err)
+	}
+	defer db.Close()
+
+	for index := 0; index < 108; index++ {
+		sql := fmt.Sprintf(
+			"SELECT email_name,email_prefix,email_name2,email_prefix2 FROM likedin_usernames_%d WHERE finished = %d AND email_name != '' AND update_time > %d AND update_time < %d",
+			index, finished, start, end,
+		)
+		if DEBUG {
+			log.Println(sql)
+		}
+		rows, _ := db.Query(sql)
+		if nil == rows {
+			continue
+		}
+		for rows.Next() {
+			var email Email
+			err := rows.Scan(&email.email_name, &email.email_prefix, &email.email_name2, &email.email_prefix2)
+			if err != nil {
+				log.Fatalf("email prefix scan fail %s", err)
+			}
+
+			var prefixList []uint
+			if "" != email.email_prefix {
+				json.Unmarshal([]byte(email.email_prefix), &prefixList)
+				count += len(prefixList)
+			}
+			if "" != email.email_prefix2.String {
+				json.Unmarshal([]byte(email.email_prefix2.String), &prefixList)
+				count += len(prefixList)
+			}
+		}
+	}
+
+	log.Printf("dump used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
+	return count
+}
+
 func bloomRequest(url string, emailList []string) []int8 {
 	response, _ := http.Post(url, "application/x-www-form-urlencoded", strings.NewReader(strings.Join(emailList, ",")))
 	jsonData, _ := ioutil.ReadAll(response.Body)
@@ -727,6 +777,10 @@ func Dump() {
 		"method[1] host port user password dbName fromTime[optional] toTime[optional] debug[optional default 0]\n" +
 		"method[2] host port user password dbName status[0:all] limit debug[optional default 0]\n" +
 		"method[3] host port user password dbName indexFile importFile debug[optional default 0]"
+
+	//GetEmailCount(config.mysql, 2, 1604246400,1604332800 )
+	//return
+
 	args := os.Args
 	//println(stringSum("✦-marla-mckenna-✦-author-speaker-graphic-designer-editor-15a87015") % 108)
 	if len(args) != 8 && len(args) != 9 && len(args) != 10 && len(args) != 7 {
@@ -770,4 +824,5 @@ func Dump() {
 	} else {
 		log.Println(readme)
 	}
+
 }
