@@ -237,7 +237,7 @@ func startSaveTask() {
 				}
 			}
 			runtime.GC()
-			saveTimer.Reset(time.Second * 60)
+			saveTimer.Reset(time.Second * 5 * 60)
 		}
 	}()
 }

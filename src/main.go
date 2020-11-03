@@ -1,6 +1,7 @@
 package main
 
 import (
+	"demo"
 	"math/rand"
 	"time"
 )
@@ -56,7 +57,7 @@ func main() {
 	//}
 	//log.Println(strings.Join(list, ","))
 
-	//demo.Dump()
+	demo.Dump()
 	//demo.Main()
 
 	//demo.EmailTest()
