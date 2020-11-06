@@ -661,6 +661,11 @@ func importEmail(host string, port string, user string, password string, dbName 
 	emailRepeatCount := 0
 	importList := readCsv(importFile)
 
+	if nil == importList || len(importList) == 0 {
+		log.Fatalf("csv file is empty. %s !!!", importFile)
+		return
+	}
+
 	executeSuccess := func() {
 		log.Println("depart data and check data")
 		updateMap := make(map[string]*EmailData)
@@ -766,7 +771,7 @@ func importEmail(host string, port string, user string, password string, dbName 
 	executeFail := func() {
 		//set un finish data
 		tx, _ := db.Begin()
-		for _, email := range importList {
+		for index, email := range importList {
 			emailCount++
 			SPLIT = rune('@')
 			emails := strings.FieldsFunc(email[0], stringSpilt)
@@ -783,19 +788,25 @@ func importEmail(host string, port string, user string, password string, dbName 
 			tableIndex := namesIndex[0]
 
 			sql := fmt.Sprintf("update likedin_usernames_%s set finished = 2,update_time = %d where id = %s limit 1", tableIndex, updateTime, id)
-			if DEBUG {
-				log.Println(sql)
-			}
+			//if DEBUG {
+			//	log.Println(sql)
+			//}
 			_, err := tx.Exec(sql)
 			if nil != err {
 				log.Fatalln(err)
 			}
 			failCount++
+
+			if index%50000 == 0 {
+				tx.Commit()
+				log.Printf("import fail email part commit index %d.", index)
+				tx, _ = db.Begin()
+			}
 		}
 		tx.Commit()
 	}
 
-	if strings.Contains(indexFile, "_fail") {
+	if strings.Contains(importFile, "_fail") {
 		executeFail()
 	} else {
 		executeSuccess()
