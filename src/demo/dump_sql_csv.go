@@ -661,128 +661,145 @@ func importEmail(host string, port string, user string, password string, dbName 
 	emailRepeatCount := 0
 	importList := readCsv(importFile)
 
-	log.Println("depart data and check data")
-	updateMap := make(map[string]*EmailData)
-	pageSize := 1000
-	_page, _ := decimal.NewFromInt(int64(len(importList))).Div(decimal.NewFromInt(int64(pageSize))).Float64()
-	pageCount := int(math.Ceil(_page))
-	for page := 0; page < pageCount; page++ {
-		var pageList [][]string
-		start := page * pageSize
-		end := (page + 1) * pageSize
-		if end > len(importList) {
-			end = len(importList)
-		}
-		pageList = importList[start:end]
-
-		log.Printf("start %d, end %d", start, end)
-		var emailList []string
-		for _, email := range pageList {
-			emailList = append(emailList, email[0])
-		}
-
-		checkList := bloomRequest("http://"+config.bloom.host+":"+strconv.Itoa(config.bloom.port)+"/batch_exists?bucket=email_ok", emailList)
-		for index, email := range emailList {
-			if checkList[index] == 1 {
-				emailRepeatCount++
-				continue
+	executeSuccess := func() {
+		log.Println("depart data and check data")
+		updateMap := make(map[string]*EmailData)
+		pageSize := 1000
+		_page, _ := decimal.NewFromInt(int64(len(importList))).Div(decimal.NewFromInt(int64(pageSize))).Float64()
+		pageCount := int(math.Ceil(_page))
+		for page := 0; page < pageCount; page++ {
+			var pageList [][]string
+			start := page * pageSize
+			end := (page + 1) * pageSize
+			if end > len(importList) {
+				end = len(importList)
 			}
-			emailCount++
-			if page == 0 && index == 0 {
-				email = email[3:]
-			}
-			SPLIT = rune('@')
-			emails := strings.FieldsFunc(email, stringSpilt)
+			pageList = importList[start:end]
 
-			emailName := emails[0]
-			prefix := prefixIdMap[emails[1]]
-			containDot := false
-			if strings.Contains(emailName, ".") {
-				containDot = true
-				emailName = strings.Replace(emailName, ".", "", len(emailName))
+			log.Printf("start %d, end %d", start, end)
+			var emailList []string
+			for _, email := range pageList {
+				emailList = append(emailList, email[0])
 			}
 
-			emailData, exists := updateMap[emailName]
-			if !exists {
-				emailData = &EmailData{}
-				namesIndex := namesMap[emailName]
-				if nil == namesIndex {
+			checkList := bloomRequest("http://"+config.bloom.host+":"+strconv.Itoa(config.bloom.port)+"/batch_exists?bucket=email_ok", emailList)
+			for index, email := range emailList {
+				if checkList[index] == 1 {
+					emailRepeatCount++
 					continue
 				}
-				emailData.tableIndex = namesIndex[0]
-				emailData.id = namesIndex[1]
-				updateMap[emailName] = emailData
+				emailCount++
+				if page == 0 && index == 0 {
+					email = email[3:]
+				}
+				SPLIT = rune('@')
+				emails := strings.FieldsFunc(email, stringSpilt)
+
+				emailName := emails[0]
+				prefix := prefixIdMap[emails[1]]
+				containDot := false
+				if strings.Contains(emailName, ".") {
+					containDot = true
+					emailName = strings.Replace(emailName, ".", "", len(emailName))
+				}
+
+				emailData, exists := updateMap[emailName]
+				if !exists {
+					emailData = &EmailData{}
+					namesIndex := namesMap[emailName]
+					if nil == namesIndex {
+						continue
+					}
+					emailData.tableIndex = namesIndex[0]
+					emailData.id = namesIndex[1]
+					updateMap[emailName] = emailData
+				}
+
+				if containDot {
+					emailData.email_name2 = emails[0] //use dot origin string
+					emailData.email_prefix2 = append(emailData.email_prefix2, prefix)
+				} else {
+					emailData.email_name = emailName
+					emailData.email_prefix = append(emailData.email_prefix, prefix)
+				}
+			}
+			//set bloom filter server
+			bloomRequest("http://"+config.bloom.host+":"+strconv.Itoa(config.bloom.port)+"/batch_add?bucket=email_ok", emailList)
+		}
+
+		log.Println("import data to database ")
+		tx, _ := db.Begin()
+		for emailName, emailData := range updateMap {
+			id := emailData.id
+			tableIndex := emailData.tableIndex
+			prefixJson, _ := json.Marshal(emailData.email_prefix)
+			prefix2Json, _ := json.Marshal(emailData.email_prefix2)
+			prefix2JsonStr := string(prefix2Json)
+			if prefix2JsonStr == "null" {
+				prefix2JsonStr = "[]"
 			}
 
-			if containDot {
-				emailData.email_name2 = emails[0] //use dot origin string
-				emailData.email_prefix2 = append(emailData.email_prefix2, prefix)
-			} else {
-				emailData.email_name = emailName
-				emailData.email_prefix = append(emailData.email_prefix, prefix)
+			sql := fmt.Sprintf(
+				"update likedin_usernames_%s set finished = 2,email_name = '%s', email_prefix = '%s',email_name2 = '%s', email_prefix2 = '%s',update_time = %d where id = %s limit 1",
+				tableIndex, emailData.email_name, string(prefixJson), emailData.email_name2, prefix2JsonStr, updateTime, id)
+			//if DEBUG {
+			//	log.Println(sql)
+			//}
+
+			//_, err := db.Exec(sql)
+			_, err := tx.Exec(sql)
+			if nil != err {
+				log.Fatalln(err)
 			}
+
+			//count, err := ret.RowsAffected()
+			successCount++
+
+			//reset
+			emailData = nil
+			//reset names Map for finish fail
+			namesMap[emailName] = nil
 		}
-		//set bloom filter server
-		bloomRequest("http://"+config.bloom.host+":"+strconv.Itoa(config.bloom.port)+"/batch_add?bucket=email_ok", emailList)
+		tx.Commit()
 	}
 
-	log.Println("import data to database ")
-	tx, _ := db.Begin()
-	for emailName, emailData := range updateMap {
-		id := emailData.id
-		tableIndex := emailData.tableIndex
-		prefixJson, _ := json.Marshal(emailData.email_prefix)
-		prefix2Json, _ := json.Marshal(emailData.email_prefix2)
-		prefix2JsonStr := string(prefix2Json)
-		if prefix2JsonStr == "null" {
-			prefix2JsonStr = "[]"
+	executeFail := func() {
+		//set un finish data
+		tx, _ := db.Begin()
+		for _, email := range importList {
+			emailCount++
+			SPLIT = rune('@')
+			emails := strings.FieldsFunc(email[0], stringSpilt)
+
+			emailName := emails[0]
+			if strings.Contains(emailName, ".") {
+				emailName = strings.Replace(emailName, ".", "", len(emailName))
+			}
+			namesIndex, exists := namesMap[emailName]
+			if !exists {
+				continue
+			}
+			id := namesIndex[1]
+			tableIndex := namesIndex[0]
+
+			sql := fmt.Sprintf("update likedin_usernames_%s set finished = 2,update_time = %d where id = %s limit 1", tableIndex, updateTime, id)
+			if DEBUG {
+				log.Println(sql)
+			}
+			_, err := tx.Exec(sql)
+			if nil != err {
+				log.Fatalln(err)
+			}
+			failCount++
 		}
-
-		sql := fmt.Sprintf(
-			"update likedin_usernames_%s set finished = 2,email_name = '%s', email_prefix = '%s',email_name2 = '%s', email_prefix2 = '%s',update_time = %d where id = %s limit 1",
-			tableIndex, emailData.email_name, string(prefixJson), emailData.email_name2, prefix2JsonStr, updateTime, id)
-		//if DEBUG {
-		//	log.Println(sql)
-		//}
-
-		//_, err := db.Exec(sql)
-		_, err := tx.Exec(sql)
-		if nil != err {
-			log.Fatalln(err)
-		}
-
-		//count, err := ret.RowsAffected()
-		successCount++
-
-		//reset
-		emailData = nil
-		//reset names Map for finish fail
-		namesMap[emailName] = nil
+		tx.Commit()
 	}
-	tx.Commit()
 
-	////set un finish data
-	//tx, _ := db.Begin()
-	//for _, v := range namesMap {
-	//	if nil == v {
-	//		//ok data
-	//		continue
-	//	}
-	//	id := v[1]
-	//	tableIndex := v[0]
-	//	sql := fmt.Sprintf("update likedin_usernames_%s set finished = 1,update_time = %d where id = %s limit 1", tableIndex, updateTime, id)
-	//	if DEBUG {
-	//		log.Println(sql)
-	//	}
-	//	//_, err := db.Exec(sql)
-	//	_, err := tx.Exec(sql)
-	//	if nil != err {
-	//		log.Fatalln(err)
-	//	}
-	//	//count, err := ret.RowsAffected()
-	//	failCount++
-	//}
-	//tx.Commit()
+	if strings.Contains(indexFile, "_fail") {
+		executeFail()
+	} else {
+		executeSuccess()
+	}
 
 	log.Printf("statstics success %d, fail %d, names repeat: %d, email count: %d, email repeat count: %d", successCount, failCount, namesRepeatCount, emailCount, emailRepeatCount)
 	log.Printf("import used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
