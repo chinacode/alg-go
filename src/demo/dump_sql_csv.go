@@ -538,10 +538,17 @@ func GetEmailCount(mysql MysqlServer, finished int, start int64, end int64) int 
 	defer db.Close()
 
 	for index := 0; index < 108; index++ {
-		sql := fmt.Sprintf(
-			"SELECT email_name,email_prefix,email_name2,email_prefix2 FROM likedin_usernames_%d WHERE finished = %d AND email_name != '' AND update_time > %d AND update_time < %d",
-			index, finished, start, end,
-		)
+		sql := fmt.Sprintf("SELECT email_name,email_prefix,email_name2,email_prefix2 FROM likedin_usernames_%d WHERE 1 = 1 ", index)
+		if finished == -1 {
+			sql += " AND finished > 0 "
+		} else if finished == 0 {
+			sql += fmt.Sprintf(" AND finished = %d ", finished)
+		} else {
+			sql += fmt.Sprintf(" AND email_name != '' AND finished = %d ", finished)
+		}
+		if finished != 0 {
+			sql += fmt.Sprintf(" AND update_time > %d AND update_time < %d", start, end)
+		}
 		if DEBUG {
 			log.Println(sql)
 		}
@@ -549,7 +556,13 @@ func GetEmailCount(mysql MysqlServer, finished int, start int64, end int64) int 
 		if nil == rows {
 			continue
 		}
+
 		for rows.Next() {
+			if finished == 0 {
+				count++
+				continue
+			}
+
 			var email Email
 			err := rows.Scan(&email.email_name, &email.email_prefix, &email.email_name2, &email.email_prefix2)
 			if err != nil {
@@ -693,6 +706,9 @@ func importEmail(host string, port string, user string, password string, dbName 
 			if !exists {
 				emailData = &EmailData{}
 				namesIndex := namesMap[emailName]
+				if nil == namesIndex {
+					continue
+				}
 				emailData.tableIndex = namesIndex[0]
 				emailData.id = namesIndex[1]
 				updateMap[emailName] = emailData
