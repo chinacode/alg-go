@@ -9,6 +9,7 @@ import (
 	"github.com/steakknife/bloomfilter"
 	hash2 "hash"
 	"hash/fnv"
+	"io"
 	"io/ioutil"
 	"net/http"
 	_ "net/http/pprof"
@@ -18,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"util"
 )
 
 var (
@@ -118,6 +120,7 @@ func Main() {
 	http.HandleFunc("/buckets", Buckets)
 	http.HandleFunc("/key_count", KeyCount)
 	http.HandleFunc("/dump_email_zip", dumpEmailZip)
+	http.HandleFunc("/import_email", importEmailData)
 	http.HandleFunc("/get_email_count", getEmailCount)
 
 	go func() {
@@ -231,7 +234,7 @@ func startSaveTask() {
 
 					////this way use lz4 zip algorithm speed is the best, size will bigger 50%
 					//zip := Zip{filename: filename, filter: filter}
-					//num, _ = zip.write()
+					//num, _ = zip.Write()
 
 					num = backupFilter(filename, filter)
 					bloomfilterMemoryMap[bucket] = num
@@ -241,6 +244,28 @@ func startSaveTask() {
 			saveTimer.Reset(time.Second * 5 * 60)
 		}
 	}()
+}
+
+func download(fileName string, response http.ResponseWriter) {
+	file, _ := os.Open(fileName)
+	defer file.Close()
+	fileHeader := make([]byte, 512)
+	file.Read(fileHeader)
+	fileStat, _ := file.Stat()
+	response.Header().Set("Content-Disposition", "attachment; filename="+fileName)
+	response.Header().Set("Content-Type", http.DetectContentType(fileHeader))
+	response.Header().Set("Content-Length", strconv.FormatInt(fileStat.Size(), 10))
+	file.Seek(0, 0)
+	io.Copy(response, file)
+}
+
+func getParams(request *http.Request, key string) string {
+	query := request.URL.Query()
+	value, exists := query[key]
+	if !exists {
+		return ""
+	}
+	return value[0]
 }
 
 func getErrorResult(msg string) *Result {
@@ -352,7 +377,9 @@ func initParams(response http.ResponseWriter, request *http.Request) (bool, map[
 	response.Header().Add("server", "bloom server")
 
 	if !strings.Contains(request.RequestURI, "config") &&
-		!strings.Contains(request.RequestURI, "buckets") {
+		!strings.Contains(request.RequestURI, "buckets") &&
+		!strings.Contains(request.RequestURI, "dump") &&
+		!strings.Contains(request.RequestURI, "import") {
 		if "" == bucket || len(bucket) <= 0 {
 			responseError(response, fmt.Sprintf("params bucket must set!"))
 			return false, params
@@ -584,21 +611,164 @@ func Buckets(response http.ResponseWriter, request *http.Request) {
 }
 
 func dumpEmailZip(response http.ResponseWriter, request *http.Request) {
-	check, _ := initParams(response, request)
-	if !check {
-		return
-	}
-	query := request.URL.Query()
-	limit := query["limit"][0]
+	limit := getParams(request, "limit")
 	if "" == limit {
 		limit = "100"
 	}
-	departs := query["departs"][0]
-	if "" == departs {
-		departs = "3"
+	status := getParams(request, "status")
+	if "" == status {
+		status = "1"
 	}
-	dumpUnValidEmailApi(config.mysql, "1", limit)
-	//responseSuccess(response, strings.Join(buckets, ","))
+	depart := int64(3)
+	_depart := getParams(request, "depart")
+	if "" != _depart {
+		depart, _ = strconv.ParseInt(_depart, 10, 34)
+	}
+	forceCover := getParams(request, "forceCover")
+	if "" == forceCover {
+		forceCover = "0"
+	}
+	timePrefix := time.Now().Format("0102")
+	indexFilename := fmt.Sprintf("%s_index.csv", timePrefix)
+	if util.FileExist(indexFilename) && "0" == forceCover {
+		responseError(response, fmt.Sprintf("file %s has generate success, if want cover it please add params foreCover=1!", indexFilename))
+		return
+	}
+
+	logger.Infof("start dump un valid email.")
+	allData, emailData := dumpUnValidEmailApi(config.mysql, status, limit)
+	logger.Infof("finish dump un valid email.")
+
+	endPrefix := ""
+	partIndex := 1
+	emailCount := len(emailData)
+	departPerCount := emailCount / int(depart)
+	departList := make([]int, depart)
+	for i := departPerCount - 1; i < emailCount; i++ {
+		SPLIT = rune('@')
+		_emailSplit := strings.FieldsFunc(emailData[i][0], stringSpilt)
+		emailName := _emailSplit[0]
+		if strings.Contains(emailName, ".") {
+			emailName = strings.Replace(emailName, ".", "", len(emailName))
+		}
+
+		//logger.Infof("%s %s", emailName, emailData[i][0])
+		if "" == endPrefix {
+			endPrefix = emailName
+		}
+
+		if endPrefix != emailName {
+			departList[partIndex-1] = i
+			partIndex++
+			endPrefix = ""
+			i = departPerCount * partIndex
+
+			if partIndex == int(depart) {
+				departList[partIndex-1] = emailCount
+				break
+			}
+		}
+	}
+
+	logger.Infof("depart list %s, username size %d, email size %d", departList, len(allData), len(emailData))
+
+	compressZip := func() {
+		Write(indexFilename, allData)
+		csvFiles := make([]*os.File, depart)
+		//time.Now().Format("2006-01-02 15:04:05")
+		lastEmailIndex := 0
+		partFileList := make([]string, depart)
+		for index, emailIndex := range departList {
+			tmpPartList := emailData[lastEmailIndex:emailIndex]
+
+			logger.Infof("start write part file %d .", index)
+			lastEmailIndex = emailIndex
+			partFilename := fmt.Sprintf("%s0%d.csv", timePrefix, index+1)
+			Write(partFilename, tmpPartList)
+
+			logger.Infof("finish write part file %s .", partFilename)
+
+			file, err := os.Open(partFilename)
+			if nil != err {
+				logger.Errorf("write file fail %s", partFilename)
+			}
+			csvFiles[index] = file
+			logger.Infof("finish read part file %s .", partFilename)
+
+			partFileList = append(partFileList, partFilename)
+		}
+
+		logger.Info("start compress file.")
+		zipFileName := fmt.Sprintf("%s(%d).tar.gz", timePrefix, len(emailData))
+		os.Remove(zipFileName)
+		util.Compress(csvFiles, zipFileName)
+
+		for _, fileName := range partFileList {
+			os.Remove(fileName)
+		}
+		download(zipFileName, response)
+		os.Remove(zipFileName)
+	}
+
+	compressZip()
+
+	allData = nil
+	emailData = nil
+	departList = nil
+}
+
+func importEmailData(response http.ResponseWriter, request *http.Request) {
+	request.ParseMultipartForm(1024 * 1024)
+	csvFile, fileHeader, err := request.FormFile("csv")
+	if err != nil {
+		responseError(response, err.Error())
+		return
+	}
+
+	defer csvFile.Close()
+	fileName := fileHeader.Filename
+	if fileHeader.Size <= 0 {
+		responseError(response, "the csv file is empty.")
+		return
+	}
+
+	copyUploadFile := func() {
+		os.Remove(fileName)
+		cur, err := os.Create(fileName)
+		defer cur.Close()
+		if err != nil {
+			logger.Error(err)
+		}
+		io.Copy(cur, csvFile)
+	}
+
+	copyUploadFile()
+
+	SPLIT = rune('.')
+	filePrefix := strings.FieldsFunc(fileName, stringSpilt)
+	timePrefix := filePrefix[0]
+	if strings.Contains(timePrefix, "_fail") {
+		SPLIT = rune('_')
+		timePrefix = strings.FieldsFunc(fileName, stringSpilt)[0]
+	}
+
+	indexFile := fmt.Sprintf("%s_index.csv", timePrefix)
+	logger.Infof("index file %s", indexFile)
+
+	logger.Infof("start import email.")
+	successCount, failCount, namesRepeatCount, emailCount, emailRepeatCount := importEmailApi(config.mysql, indexFile, fileName)
+	logger.Infof("finish import email.")
+
+	jsonMap := make(map[string]string)
+
+	jsonMap["filename"] = fileName
+	jsonMap["successCount"] = string(successCount)
+	jsonMap["failCount"] = string(failCount)
+	jsonMap["namesRepeatCount"] = string(namesRepeatCount)
+	jsonMap["emailCount"] = string(emailCount)
+	jsonMap["emailRepeatCount"] = string(emailRepeatCount)
+
+	responseSuccess(response, jsonMap)
 }
 
 func getEmailCount(response http.ResponseWriter, request *http.Request) {

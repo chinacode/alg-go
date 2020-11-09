@@ -73,7 +73,7 @@ var (
 	bloomInstance, err = bloomfilter.NewOptimal(maxElements, probCollide) //check repeat email
 )
 
-func write(fileName string, data [][]string) {
+func Write(fileName string, data [][]string) {
 	os.Remove(fileName)
 	//isNew := false
 	f, err := os.Create(fileName)
@@ -90,7 +90,7 @@ func write(fileName string, data [][]string) {
 	w.Flush()
 }
 
-func readCsv(filename string) [][]string {
+func ReadCsv(filename string) [][]string {
 	var lines [][]string
 	file, err := os.Open(filename)
 	if err != nil {
@@ -250,14 +250,14 @@ func dumpEmail(host string, port string, user string, password string, dbName st
 	if start+end == "" {
 		name = "dump_email_api_(all).csv"
 	}
-	write(name, apiData)
+	Write(name, apiData)
 	log.Printf("name: %s, count: %d", name, ac)
 
 	name = fmt.Sprintf("dump_email_script_(%s~%s).csv", start, end)
 	if start+end == "" {
 		name = "dump_email_script_(all).csv"
 	}
-	write(name, scriptData)
+	Write(name, scriptData)
 	log.Printf("name: %s, count: %d", name, sc)
 
 	if DEBUG {
@@ -424,14 +424,16 @@ func dumpUnValidEmailApi(mysql MysqlServer, status string, limit string) ([][]st
 }
 
 func dumpUnValidEmail(host string, port string, user string, password string, dbName string, status string, limit string, writeFile bool) ([][]string, [][]string) {
+	bloomInstance, err = bloomfilter.NewOptimal(maxElements, probCollide)
 	startTime := time.Now().UnixNano()
 	log.Printf("dump start %s", time.Now().String())
-	dbUser := flag.String("user", user, "database user")
-	dbPassword := flag.String("password", password, "database password")
-	dbHost := flag.String("hostname", host, "database host")
-	dbPort := flag.String("port", port, "database port")
+	//dbUser := flag.String("user", user, "database user")
+	//dbPassword := flag.String("password", password, "database password")
+	//dbHost := flag.String("hostname", host, "database host")
+	//dbPort := flag.String("port", port, "database port")
+	//dbUrl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", *dbUser, *dbPassword, *dbHost, *dbPort, dbName)
 
-	dbUrl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", *dbUser, *dbPassword, *dbHost, *dbPort, dbName)
+	dbUrl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", user, password, host, port, dbName)
 	if DEBUG {
 		log.Println(dbUrl)
 	}
@@ -511,10 +513,10 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 
 	name := fmt.Sprintf("dump_email_checker_(%s).csv", limit)
 	if writeFile {
-		write(name, emailData)
+		Write(name, emailData)
 
 		name = fmt.Sprintf("dump_email_import_(%s).csv", limit)
-		write(name, allData)
+		Write(name, allData)
 	}
 
 	log.Printf("name: %s, user count: %d, email count:%d, repeat %d", name, len(allData), len(emailData), repeatCount)
@@ -608,11 +610,12 @@ func bloomRequest(url string, emailList []string) []int8 {
 	return checkList
 }
 
-func importEmailApi(mysql MysqlServer, indexFile string, importFile string) {
-	importEmail(mysql.host, strconv.Itoa(mysql.port), mysql.user, mysql.password, mysql.database, indexFile, importFile)
+func importEmailApi(mysql MysqlServer, indexFile string, importFile string) (int, int, int, int, int) {
+	return 0, 0, 0, 0, 0
+	//return importEmail(mysql.host, strconv.Itoa(mysql.port), mysql.user, mysql.password, mysql.database, indexFile, importFile)
 }
 
-func importEmail(host string, port string, user string, password string, dbName string, indexFile string, importFile string) {
+func importEmail(host string, port string, user string, password string, dbName string, indexFile string, importFile string) (int, int, int, int, int) {
 	startTime := time.Now().UnixNano()
 	log.Printf("dump start %s", time.Now().String())
 	dbUser := flag.String("user", user, "database user")
@@ -639,7 +642,7 @@ func importEmail(host string, port string, user string, password string, dbName 
 
 	namesRepeatCount := 0
 	updateTime := time.Now().Unix()
-	indexList := readCsv(indexFile)
+	indexList := ReadCsv(indexFile)
 	namesMap := make(map[string][]string)
 	for _, indexEmail := range indexList {
 		key := strings.TrimSpace(indexEmail[2])
@@ -659,11 +662,11 @@ func importEmail(host string, port string, user string, password string, dbName 
 	successCount := 0
 	emailCount := 0
 	emailRepeatCount := 0
-	importList := readCsv(importFile)
+	importList := ReadCsv(importFile)
 
 	if nil == importList || len(importList) == 0 {
 		log.Fatalf("csv file is empty. %s !!!", importFile)
-		return
+		return successCount, failCount, namesRepeatCount, emailCount, emailRepeatCount
 	}
 
 	executeSuccess := func() {
@@ -733,6 +736,7 @@ func importEmail(host string, port string, user string, password string, dbName 
 		}
 
 		log.Println("import data to database ")
+		rowIndex := 0
 		tx, _ := db.Begin()
 		for emailName, emailData := range updateMap {
 			id := emailData.id
@@ -764,6 +768,13 @@ func importEmail(host string, port string, user string, password string, dbName 
 			emailData = nil
 			//reset names Map for finish fail
 			namesMap[emailName] = nil
+
+			if rowIndex%2000 == 0 {
+				tx.Commit()
+				log.Printf("import success email part commit index %d.", rowIndex)
+				tx, _ = db.Begin()
+			}
+			rowIndex++
 		}
 		tx.Commit()
 	}
@@ -780,10 +791,14 @@ func importEmail(host string, port string, user string, password string, dbName 
 			if strings.Contains(emailName, ".") {
 				emailName = strings.Replace(emailName, ".", "", len(emailName))
 			}
+			failCount++
+
 			namesIndex, exists := namesMap[emailName]
 			if !exists {
 				continue
 			}
+			//delete key for one key execute once
+			delete(namesMap, emailName)
 			id := namesIndex[1]
 			tableIndex := namesIndex[0]
 
@@ -795,9 +810,8 @@ func importEmail(host string, port string, user string, password string, dbName 
 			if nil != err {
 				log.Fatalln(err)
 			}
-			failCount++
 
-			if index%50000 == 0 {
+			if index%5000 == 0 {
 				tx.Commit()
 				log.Printf("import fail email part commit index %d.", index)
 				tx, _ = db.Begin()
@@ -814,6 +828,7 @@ func importEmail(host string, port string, user string, password string, dbName 
 
 	log.Printf("statstics success %d, fail %d, names repeat: %d, email count: %d, email repeat count: %d", successCount, failCount, namesRepeatCount, emailCount, emailRepeatCount)
 	log.Printf("import used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
+	return successCount, failCount, namesRepeatCount, emailCount, emailRepeatCount
 }
 
 func Dump() {
