@@ -629,6 +629,24 @@ func dumpEmailZip(response http.ResponseWriter, request *http.Request) {
 		forceCover = "0"
 	}
 	timePrefix := time.Now().Format("0102")
+
+	//delete old file
+	deleteOldFile := func() {
+		timeInt, _ := strconv.ParseInt(timePrefix, 10, 64)
+		for i := timeInt - 7; i > timeInt-21; i-- {
+			oldFileName := fmt.Sprintf("%d_index.csv", i)
+			if i < 1000 {
+				oldFileName = fmt.Sprintf("0%d_index.csv", i)
+			}
+			err := os.Remove(oldFileName)
+			if nil != err {
+				continue
+			}
+			logger.Infof("delete old file %s", oldFileName)
+		}
+	}
+	deleteOldFile()
+
 	indexFilename := fmt.Sprintf("%s_index.csv", timePrefix)
 	if util.FileExist(indexFilename) && "0" == forceCover {
 		responseError(response, fmt.Sprintf("file %s has generate success, if want cover it please add params foreCover=1!", indexFilename))
@@ -720,6 +738,10 @@ func dumpEmailZip(response http.ResponseWriter, request *http.Request) {
 func importEmailData(response http.ResponseWriter, request *http.Request) {
 	request.ParseMultipartForm(1024 * 1024)
 	csvFile, fileHeader, err := request.FormFile("csv")
+	if nil == fileHeader {
+		responseError(response, "csv file not select.")
+		return
+	}
 	if err != nil {
 		responseError(response, err.Error())
 		return
@@ -759,15 +781,15 @@ func importEmailData(response http.ResponseWriter, request *http.Request) {
 	successCount, failCount, namesRepeatCount, emailCount, emailRepeatCount := importEmailApi(config.mysql, indexFile, fileName)
 	logger.Infof("finish import email.")
 
-	jsonMap := make(map[string]string)
+	os.Remove(fileName)
 
+	jsonMap := make(map[string]string)
 	jsonMap["filename"] = fileName
 	jsonMap["successCount"] = string(successCount)
 	jsonMap["failCount"] = string(failCount)
 	jsonMap["namesRepeatCount"] = string(namesRepeatCount)
 	jsonMap["emailCount"] = string(emailCount)
 	jsonMap["emailRepeatCount"] = string(emailRepeatCount)
-
 	responseSuccess(response, jsonMap)
 }
 
