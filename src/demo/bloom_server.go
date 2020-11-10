@@ -702,7 +702,7 @@ func dumpEmailZip(response http.ResponseWriter, request *http.Request) {
 			logger.Infof("start write part file %d .", index)
 			lastEmailIndex = emailIndex
 			partFilename := fmt.Sprintf("%s0%d.csv", timePrefix, index+1)
-			Write(partFilename, tmpPartList)
+			WriteCsv(partFilename, tmpPartList, false)
 
 			logger.Infof("finish write part file %s .", partFilename)
 

@@ -74,6 +74,10 @@ var (
 )
 
 func Write(fileName string, data [][]string) {
+	WriteCsv(fileName, data, true)
+}
+
+func WriteCsv(fileName string, data [][]string, addBom bool) {
 	os.Remove(fileName)
 	//isNew := false
 	f, err := os.Create(fileName)
@@ -83,7 +87,10 @@ func Write(fileName string, data [][]string) {
 	}
 	defer f.Close()
 	//if isNew {
-	f.WriteString("\xEF\xBB\xBF") // 写入一个UTF-8 BOM
+	// 写入一个UTF-8 BOM
+	if addBom {
+		f.WriteString("\xEF\xBB\xBF")
+	}
 	//}
 	w := csv.NewWriter(f) //创建一个新的写入文件流
 	w.WriteAll(data)
