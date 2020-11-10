@@ -611,19 +611,20 @@ func bloomRequest(url string, emailList []string) []int8 {
 }
 
 func importEmailApi(mysql MysqlServer, indexFile string, importFile string) (int, int, int, int, int) {
-	return 0, 0, 0, 0, 0
-	//return importEmail(mysql.host, strconv.Itoa(mysql.port), mysql.user, mysql.password, mysql.database, indexFile, importFile)
+	//return 0, 0, 0, 0, 0
+	return importEmail(mysql.host, strconv.Itoa(mysql.port), mysql.user, mysql.password, mysql.database, indexFile, importFile)
 }
 
 func importEmail(host string, port string, user string, password string, dbName string, indexFile string, importFile string) (int, int, int, int, int) {
+	bloomInstance, err = bloomfilter.NewOptimal(maxElements, probCollide)
 	startTime := time.Now().UnixNano()
 	log.Printf("dump start %s", time.Now().String())
-	dbUser := flag.String("user", user, "database user")
-	dbPassword := flag.String("password", password, "database password")
-	dbHost := flag.String("hostname", host, "database host")
-	dbPort := flag.String("port", port, "database port")
+	//dbUser := flag.String("user", user, "database user")
+	//dbPassword := flag.String("password", password, "database password")
+	//dbHost := flag.String("hostname", host, "database host")
+	//dbPort := flag.String("port", port, "database port")
 
-	dbUrl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", *dbUser, *dbPassword, *dbHost, *dbPort, dbName)
+	dbUrl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", user, password, host, port, dbName)
 	if DEBUG {
 		log.Println(dbUrl)
 	}

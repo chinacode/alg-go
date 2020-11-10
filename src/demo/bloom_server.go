@@ -773,8 +773,17 @@ func importEmailData(response http.ResponseWriter, request *http.Request) {
 		SPLIT = rune('_')
 		timePrefix = strings.FieldsFunc(fileName, stringSpilt)[0]
 	}
+	if len(timePrefix) == 6 {
+		timePrefix = timePrefix[:4]
+	}
 
 	indexFile := fmt.Sprintf("%s_index.csv", timePrefix)
+	_, err = os.Open(indexFile)
+	if nil != err {
+		responseError(response, fmt.Sprintf("the index file not exists %d, please check you csv name.", indexFile))
+		return
+	}
+
 	logger.Infof("index file %s", indexFile)
 
 	logger.Infof("start import email.")
