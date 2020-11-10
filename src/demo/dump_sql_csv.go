@@ -231,8 +231,8 @@ func dumpEmail(host string, port string, user string, password string, dbName st
 
 	prefixMap := getPrefix(db)
 	for index := 0; index < 108; index++ {
-		//sql := fmt.Sprintf("SELECT email_name,email_prefix,IFNULL(email_name2,'') email_name2,IFNULL(email_prefix2,'[]') email_prefix2 FROM likedin_usernames_%d WHERE 1 = 1 ", index)
-		sql := fmt.Sprintf("SELECT email_name,email_prefix,email_name2,email_prefix2 FROM likedin_usernames_%d WHERE 1 = 1 ", index)
+		//sql := fmt.Sprintf("SELECT email_name,email_prefix,IFNULL(email_name2,'') email_name2,IFNULL(email_prefix2,'[]') email_prefix2 FROM linkedin_usernames_%d WHERE 1 = 1 ", index)
+		sql := fmt.Sprintf("SELECT email_name,email_prefix,email_name2,email_prefix2 FROM linkedin_usernames_%d WHERE 1 = 1 ", index)
 		if _start.Unix() > 0 {
 			sql = sql + fmt.Sprintf(" AND update_time >= %d", _start.Unix())
 		}
@@ -472,7 +472,7 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 
 	discardList := make(map[int][]string)
 	for index := 0; index < 108; index++ {
-		sql := fmt.Sprintf("SELECT id,username FROM likedin_usernames_%d WHERE finished = 1 AND email_name = '' AND update_time > 0 limit %s", index, limit)
+		sql := fmt.Sprintf("SELECT id,username FROM linkedin_usernames_%d WHERE finished = 1 AND email_name = '' AND update_time > 0 limit %s", index, limit)
 		if DEBUG {
 			log.Println(sql)
 		}
@@ -530,7 +530,7 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 		if len(discards) <= 0 {
 			continue
 		}
-		sql := fmt.Sprintf("UPDATE likedin_usernames_%d set update_time = 0 where id IN (%s) AND finished = 1", index, strings.Join(discards, ","))
+		sql := fmt.Sprintf("UPDATE linkedin_usernames_%d set update_time = 0 where id IN (%s) AND finished = 1", index, strings.Join(discards, ","))
 		//log.Println(sql)
 		ret, err := db.Exec(sql)
 		if nil != err {
@@ -570,7 +570,7 @@ func GetEmailCount(mysql MysqlServer, finished int, start int64, end int64) int 
 	defer db.Close()
 
 	for index := 0; index < 108; index++ {
-		sql := fmt.Sprintf("SELECT email_name,email_prefix,email_name2,email_prefix2 FROM likedin_usernames_%d WHERE 1 = 1 ", index)
+		sql := fmt.Sprintf("SELECT email_name,email_prefix,email_name2,email_prefix2 FROM linkedin_usernames_%d WHERE 1 = 1 ", index)
 		if finished == -1 {
 			sql += " AND finished > 0 "
 		} else if finished == 0 {
@@ -780,7 +780,7 @@ func importEmail(host string, port string, user string, password string, dbName 
 			}
 
 			sql := fmt.Sprintf(
-				"update likedin_usernames_%s set finished = 2,email_name = '%s', email_prefix = '%s',email_name2 = '%s', email_prefix2 = '%s',update_time = %d where id = %s limit 1",
+				"update linkedin_usernames_%s set finished = 2,email_name = '%s', email_prefix = '%s',email_name2 = '%s', email_prefix2 = '%s',update_time = %d where id = %s limit 1",
 				tableIndex, emailData.email_name, string(prefixJson), emailData.email_name2, prefix2JsonStr, updateTime, id)
 			//if DEBUG {
 			//	log.Println(sql)
@@ -833,7 +833,7 @@ func importEmail(host string, port string, user string, password string, dbName 
 			id := namesIndex[1]
 			tableIndex := namesIndex[0]
 
-			sql := fmt.Sprintf("update likedin_usernames_%s set finished = 2,update_time = %d where id = %s limit 1", tableIndex, updateTime, id)
+			sql := fmt.Sprintf("update linkedin_usernames_%s set finished = 2,update_time = %d where id = %s limit 1", tableIndex, updateTime, id)
 			//if DEBUG {
 			//	log.Println(sql)
 			//}
