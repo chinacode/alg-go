@@ -470,8 +470,9 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 		prefixList = append(prefixList, v.email_prefix)
 	}
 
+	discardList := make(map[int][]string)
 	for index := 0; index < 108; index++ {
-		sql := fmt.Sprintf("SELECT id,username FROM likedin_usernames_%d WHERE finished = 1 AND email_name = '' limit %s", index, limit)
+		sql := fmt.Sprintf("SELECT id,username FROM likedin_usernames_%d WHERE finished = 1 AND email_name = '' AND update_time > 0 limit %s", index, limit)
 		if DEBUG {
 			log.Println(sql)
 		}
@@ -479,6 +480,7 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 		if nil == rows {
 			continue
 		}
+		var discardTableList []string
 		for rows.Next() {
 			var username UserName
 			err := rows.Scan(&username.id, &username.username)
@@ -487,6 +489,7 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 			}
 			emailNames := getEmailName(username.username)
 			if len(emailNames) <= 0 {
+				discardTableList = append(discardTableList, strconv.FormatInt(username.id, 10))
 				continue
 			}
 			indexString := strconv.Itoa(index)
@@ -516,7 +519,27 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 			tmpEmails = append(tmpEmails, username.username)
 			allData = append(allData, tmpEmails)
 		}
+
+		discardList[index] = discardTableList
+		discardTableList = nil
 	}
+
+	//update can't generate email user id
+	tx, _ := db.Begin()
+	for index, discards := range discardList {
+		if len(discards) <= 0 {
+			continue
+		}
+		sql := fmt.Sprintf("UPDATE likedin_usernames_%d set update_time = 0 where id IN (%s) AND finished = 1", index, strings.Join(discards, ","))
+		//log.Println(sql)
+		ret, err := db.Exec(sql)
+		if nil != err {
+		}
+		rowsAffected, _ := ret.RowsAffected()
+		logger.Infof("table index %d, ret %s, length %d ", index, rowsAffected, len(discards))
+	}
+	tx.Commit()
+	discardList = nil
 
 	name := fmt.Sprintf("dump_email_checker_(%s).csv", limit)
 	if writeFile {
