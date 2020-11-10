@@ -794,11 +794,11 @@ func importEmailData(response http.ResponseWriter, request *http.Request) {
 
 	jsonMap := make(map[string]string)
 	jsonMap["filename"] = fileName
-	jsonMap["successCount"] = string(successCount)
-	jsonMap["failCount"] = string(failCount)
-	jsonMap["namesRepeatCount"] = string(namesRepeatCount)
-	jsonMap["emailCount"] = string(emailCount)
-	jsonMap["emailRepeatCount"] = string(emailRepeatCount)
+	jsonMap["successCount"] = strconv.Itoa(successCount)
+	jsonMap["failCount"] = strconv.Itoa(failCount)
+	jsonMap["namesRepeatCount"] = strconv.Itoa(namesRepeatCount)
+	jsonMap["emailCount"] = strconv.Itoa(emailCount)
+	jsonMap["emailRepeatCount"] = strconv.Itoa(emailRepeatCount)
 	responseSuccess(response, jsonMap)
 }
 
