@@ -102,10 +102,43 @@ func (z *Zip) write() (n int64, err error) {
 	return num, err
 }
 
+func initConfig() {
+	args := os.Args
+	for i := 0; i < len(args); i++ {
+		key := args[i]
+		if !strings.Contains(key, "-") {
+			continue
+		}
+		nextValue := ""
+		if i < len(args) {
+			nextValue = args[i+1]
+		}
+		switch key {
+		case "-h":
+			config.mysql.host = nextValue
+			i++
+		case "-p":
+			port, _ := strconv.ParseInt(nextValue, 10, 64)
+			config.mysql.port = int(port)
+			i++
+		case "-u":
+			config.mysql.user = nextValue
+			i++
+		case "-P":
+			config.mysql.password = nextValue
+			i++
+		case "-d":
+			config.mysql.database = nextValue
+			i++
+		}
+	}
+}
+
 func Main() {
 	runtime.GOMAXPROCS(2)
 	seelog.ReplaceLogger(logger)
 	defer seelog.Flush()
+	initConfig()
 
 	http.HandleFunc("/", Index)
 	http.HandleFunc("/config", SetConfig)
