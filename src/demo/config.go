@@ -18,7 +18,7 @@ type Config struct {
 
 var (
 	config = Config{
-		bloom: BloomServer{host: "192.168.1.200", port: 9002},
+		bloom: BloomServer{host: "127.0.0.1", port: 9002},
 		mysql: MysqlServer{host: "192.168.1.200", port: 3306, user: "root", password: "Paramida@2019", database: "brandu_crawl"},
 	}
 )
