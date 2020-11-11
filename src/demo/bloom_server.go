@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/cihub/seelog"
-	"github.com/pierrec/lz4"
 	"github.com/steakknife/bloomfilter"
 	hash2 "hash"
 	"hash/fnv"
@@ -226,14 +225,14 @@ func backupFilter(filename string, filter *bloomfilter.Filter) int64 {
 	defer func() {
 		err = w.Close()
 	}()
-	//rawW := gzip.NewWriter(w)
-	//defer func() {
-	//	err = rawW.Close()
-	//}()
-	rawW := lz4.NewWriter(w)
+	rawW := gzip.NewWriter(w)
 	defer func() {
 		err = rawW.Close()
 	}()
+	//rawW := lz4.NewWriter(w)
+	//defer func() {
+	//	err = rawW.Close()
+	//}()
 	//filter.WriteFile(filename)
 	content, err := filter.MarshalBinary()
 	if nil != err {
