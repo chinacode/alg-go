@@ -872,7 +872,8 @@ func Dump() {
 	//return
 
 	args := os.Args
-	//println(stringSum("✦-marla-mckenna-✦-author-speaker-graphic-designer-editor-15a87015") % 108)
+	//println(stringSum("be-creative") % 108)
+	//return
 	if len(args) != 8 && len(args) != 9 && len(args) != 10 && len(args) != 7 {
 		log.Println(args)
 		log.Println(readme)
