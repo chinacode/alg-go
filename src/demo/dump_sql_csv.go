@@ -832,8 +832,8 @@ func importEmail(host string, port string, user string, password string, dbName 
 			delete(namesMap, emailName)
 			id := namesIndex[1]
 			tableIndex := namesIndex[0]
-
-			sql := fmt.Sprintf("update linkedin_usernames_%s set finished = 2,update_time = %d where id = %s limit 1", tableIndex, updateTime, id)
+			//for update fail and if is success then jump it
+			sql := fmt.Sprintf("update linkedin_usernames_%s set finished = 2,update_time = %d where id = %s AND email_name = '' limit 1", tableIndex, updateTime, id)
 			//if DEBUG {
 			//	log.Println(sql)
 			//}

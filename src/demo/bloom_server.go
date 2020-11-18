@@ -103,6 +103,9 @@ func (z *Zip) write() (n int64, err error) {
 
 func initConfig() {
 	args := os.Args
+	if len(args) <= 1 {
+		return
+	}
 	for i := 0; i < len(args); i++ {
 		key := args[i]
 		if !strings.Contains(key, "-") {
