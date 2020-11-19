@@ -913,7 +913,7 @@ func Dump() {
 		//getEmailName("-0123456789+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
 		//getEmailName("владимир-конельский-144497158")
 		//getEmailName("4d-ageng-anom-1a975518b")
-		importEmail(args[2], args[3], args[4], args[5], args[6], args[7], args[8])
+		importEmail(args[2], args[3], args[4], args[5], args[6], args[7], args[8], false)
 		//println(isMixing("5a50a6162"))
 	} else {
 		log.Println(readme)
