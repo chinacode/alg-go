@@ -640,12 +640,12 @@ func bloomRequest(url string, emailList []string) []int8 {
 	return checkList
 }
 
-func importEmailApi(mysql MysqlServer, indexFile string, importFile string) (int, int, int, int, int) {
+func importEmailApi(mysql MysqlServer, indexFile string, importFile string, forceImport bool) (int, int, int, int, int) {
 	//return 0, 0, 0, 0, 0
-	return importEmail(mysql.host, strconv.Itoa(mysql.port), mysql.user, mysql.password, mysql.database, indexFile, importFile)
+	return importEmail(mysql.host, strconv.Itoa(mysql.port), mysql.user, mysql.password, mysql.database, indexFile, importFile, forceImport)
 }
 
-func importEmail(host string, port string, user string, password string, dbName string, indexFile string, importFile string) (int, int, int, int, int) {
+func importEmail(host string, port string, user string, password string, dbName string, indexFile string, importFile string, forceImport bool) (int, int, int, int, int) {
 	bloomInstance, err = bloomfilter.NewOptimal(maxElements, probCollide)
 	startTime := time.Now().UnixNano()
 	log.Printf("dump start %s", time.Now().String())
@@ -721,9 +721,12 @@ func importEmail(host string, port string, user string, password string, dbName 
 				emailList = append(emailList, email[0])
 			}
 
-			checkList := bloomRequest("http://"+config.bloom.host+":"+strconv.Itoa(config.bloom.port)+"/batch_exists?bucket=email_ok", emailList)
+			var checkList []int8
+			if !forceImport {
+				checkList = bloomRequest("http://"+config.bloom.host+":"+strconv.Itoa(config.bloom.port)+"/batch_exists?bucket=email_ok", emailList)
+			}
 			for index, email := range emailList {
-				if checkList[index] == 1 {
+				if !forceImport && checkList[index] == 1 {
 					emailRepeatCount++
 					continue
 				}

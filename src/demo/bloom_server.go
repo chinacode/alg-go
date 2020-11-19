@@ -789,6 +789,11 @@ func importEmailData(response http.ResponseWriter, request *http.Request) {
 		return
 	}
 
+	forceImport := getParams(request, "forceImport")
+	if "" == forceImport {
+		forceImport = "0"
+	}
+
 	copyUploadFile := func() {
 		os.Remove(fileName)
 		cur, err := os.Create(fileName)
@@ -822,7 +827,7 @@ func importEmailData(response http.ResponseWriter, request *http.Request) {
 	logger.Infof("index file %s", indexFile)
 
 	logger.Infof("start import email.")
-	successCount, failCount, namesRepeatCount, emailCount, emailRepeatCount := importEmailApi(config.mysql, indexFile, fileName)
+	successCount, failCount, namesRepeatCount, emailCount, emailRepeatCount := importEmailApi(config.mysql, indexFile, fileName, forceImport == "1")
 	logger.Infof("finish import email.")
 
 	os.Remove(fileName)
