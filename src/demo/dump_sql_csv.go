@@ -512,6 +512,7 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 					bloomInstance.Add(hash)
 				}
 			}
+
 			//add empty dot email
 			if len(emailNames) == 1 {
 				tmpEmails = append(tmpEmails, "")
@@ -522,6 +523,39 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 
 		discardList[index] = discardTableList
 		discardTableList = nil
+	}
+
+	//check bloom server
+	var newEmailData [][]string
+	allIndex := 0
+	pageSize := 1000
+	_page, _ := decimal.NewFromInt(int64(len(emailData))).Div(decimal.NewFromInt(int64(pageSize))).Float64()
+	pageCount := int(math.Ceil(_page))
+	for page := 0; page < pageCount; page++ {
+		var pageList [][]string
+		start := page * pageSize
+		end := (page + 1) * pageSize
+		if end > len(emailData) {
+			end = len(emailData)
+		}
+		pageList = emailData[start:end]
+		logger.Infof("start %d, end %d", start, end)
+		var emailList []string
+		for _, email := range pageList {
+			emailList = append(emailList, email[0])
+		}
+
+		var checkList = bloomRequest("http://"+config.bloom.host+":"+strconv.Itoa(config.bloom.port)+"/batch_exists?bucket=email_ok", emailList)
+		for _, index := range checkList {
+			if index == 1 {
+				allIndex++
+				continue
+			}
+			newEmailData = append(newEmailData, emailData[allIndex])
+			allIndex++
+		}
+		emailList = nil
+		checkList = nil
 	}
 
 	//update can't generate email user id
@@ -546,12 +580,12 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 		Write(name, emailData)
 
 		name = fmt.Sprintf("dump_email_import_(%s).csv", limit)
-		Write(name, allData)
+		Write(name, newEmailData)
 	}
 
-	log.Printf("name: %s, user count: %d, email count:%d, repeat %d", name, len(allData), len(emailData), repeatCount)
-	log.Printf("dump used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
-	return allData, emailData
+	logger.Infof("name: %s, user-count: %d, email-count:%d, un-exists-email-count:%d, repeat %d", name, len(allData), len(emailData), len(newEmailData), repeatCount)
+	logger.Infof("dump used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
+	return newEmailData, emailData
 }
 
 func GetEmailCount(mysql MysqlServer, finished int, start int64, end int64) int {
