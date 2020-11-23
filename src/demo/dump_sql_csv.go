@@ -577,15 +577,15 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 
 	name := fmt.Sprintf("dump_email_checker_(%s).csv", limit)
 	if writeFile {
-		Write(name, emailData)
+		Write(name, newEmailData)
 
 		name = fmt.Sprintf("dump_email_import_(%s).csv", limit)
-		Write(name, newEmailData)
+		Write(name, allData)
 	}
 
 	logger.Infof("name: %s, user-count: %d, email-count:%d, un-exists-email-count:%d, repeat %d", name, len(allData), len(emailData), len(newEmailData), repeatCount)
 	logger.Infof("dump used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
-	return newEmailData, emailData
+	return allData, newEmailData
 }
 
 func GetEmailCount(mysql MysqlServer, finished int, start int64, end int64) int {
@@ -682,7 +682,7 @@ func importEmailApi(mysql MysqlServer, indexFile string, importFile string, forc
 func importEmail(host string, port string, user string, password string, dbName string, indexFile string, importFile string, forceImport bool) (int, int, int, int, int) {
 	bloomInstance, err = bloomfilter.NewOptimal(maxElements, probCollide)
 	startTime := time.Now().UnixNano()
-	log.Printf("dump start %s", time.Now().String())
+	logger.Infof("import start %s", time.Now().String())
 	//dbUser := flag.String("user", user, "database user")
 	//dbPassword := flag.String("password", password, "database password")
 	//dbHost := flag.String("hostname", host, "database host")
@@ -695,7 +695,7 @@ func importEmail(host string, port string, user string, password string, dbName 
 	db, err := sql.Open("mysql", dbUrl)
 
 	if err != nil {
-		log.Fatalf("Could not connect to server: %s\n", err)
+		logger.Errorf("Could not connect to server: %s\n", err)
 	}
 	defer db.Close()
 
@@ -710,6 +710,9 @@ func importEmail(host string, port string, user string, password string, dbName 
 	indexList := ReadCsv(indexFile)
 	namesMap := make(map[string][]string)
 	for _, indexEmail := range indexList {
+		if len(indexEmail) < 3 {
+			logger.Infof("jump email %s", indexEmail)
+		}
 		key := strings.TrimSpace(indexEmail[2])
 		if nil != namesMap[key] {
 			//log.Println(indexEmail)
