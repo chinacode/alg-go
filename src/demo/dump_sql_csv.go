@@ -191,6 +191,11 @@ func generateEmailList(rows *sql.Rows, prefixMap map[uint]EmailPrefix, apiData [
 	return apiData, scriptData
 }
 
+func dump_email_simple(mysql MysqlServer, start string, end string) {
+	DEBUG = true
+	dumpEmail(mysql.host, strconv.Itoa(mysql.port), mysql.user, mysql.password, mysql.database, start, end)
+}
+
 func dumpEmail(host string, port string, user string, password string, dbName string, start string, end string) {
 	var _start time.Time
 	var _end time.Time
@@ -240,8 +245,9 @@ func dumpEmail(host string, port string, user string, password string, dbName st
 			sql = sql + fmt.Sprintf(" AND update_time < %d", _end.Unix())
 		}
 		sql = sql + " AND email_name != ''"
+		sql = sql + " ORDER BY id desc "
 		if DEBUG {
-			log.Println(sql)
+			logger.Infof(sql)
 		}
 		rows, _ := db.Query(sql)
 		if nil == rows {
@@ -910,6 +916,9 @@ func Dump() {
 
 	//GetEmailCount(config.mysql, 2, 1604246400,1604332800 )
 	//return
+
+	dump_email_simple(config.mysql, "2020-11-18", "2020-11-24")
+	return
 
 	args := os.Args
 	//println(stringSum("be-creative") % 108)
