@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/csv"
 	"encoding/json"
-	"flag"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql" // or the driver of your choice
 	"github.com/shopspring/decimal"
@@ -191,12 +190,12 @@ func generateEmailList(rows *sql.Rows, prefixMap map[uint]EmailPrefix, apiData [
 	return apiData, scriptData
 }
 
-func dump_email_simple(mysql MysqlServer, start string, end string) {
-	DEBUG = true
-	dumpEmail(mysql.host, strconv.Itoa(mysql.port), mysql.user, mysql.password, mysql.database, start, end)
+func DumpEmailSimple(mysql MysqlServer, start string, end string, finished int) (string, int) {
+	DEBUG = false
+	return dumpEmail(mysql.host, strconv.Itoa(mysql.port), mysql.user, mysql.password, mysql.database, start, end, finished)
 }
 
-func dumpEmail(host string, port string, user string, password string, dbName string, start string, end string) {
+func dumpEmail(host string, port string, user string, password string, dbName string, start string, end string, finished int) (string, int) {
 	var _start time.Time
 	var _end time.Time
 	if "" != start {
@@ -216,12 +215,11 @@ func dumpEmail(host string, port string, user string, password string, dbName st
 
 	startTime := time.Now().UnixNano()
 	log.Printf("dump start %s", time.Now().String())
-	dbUser := flag.String("user", user, "database user")
-	dbPassword := flag.String("password", password, "database password")
-	dbHost := flag.String("hostname", host, "database host")
-	dbPort := flag.String("port", port, "database port")
-
-	dbUrl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", *dbUser, *dbPassword, *dbHost, *dbPort, dbName)
+	//dbUser := flag.String("user", user, "database user")
+	//dbPassword := flag.String("password", password, "database password")
+	//dbHost := flag.String("hostname", host, "database host")
+	//dbPort := flag.String("port", port, "database port")
+	dbUrl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", user, password, host, port, dbName)
 	if DEBUG {
 		log.Println(dbUrl)
 	}
@@ -245,7 +243,10 @@ func dumpEmail(host string, port string, user string, password string, dbName st
 			sql = sql + fmt.Sprintf(" AND update_time < %d", _end.Unix())
 		}
 		sql = sql + " AND email_name != ''"
-		sql = sql + " ORDER BY id desc "
+		if finished >= 0 {
+			sql = sql + fmt.Sprintf(" AND finished = %d", finished)
+		}
+		sql = sql + " ORDER BY id "
 		if DEBUG {
 			logger.Infof(sql)
 		}
@@ -266,11 +267,11 @@ func dumpEmail(host string, port string, user string, password string, dbName st
 	Write(name, apiData)
 	log.Printf("name: %s, count: %d", name, ac)
 
-	name = fmt.Sprintf("dump_email_script_(%s~%s).csv", start, end)
-	if start+end == "" {
-		name = "dump_email_script_(all).csv"
-	}
-	Write(name, scriptData)
+	//name = fmt.Sprintf("dump_email_script_(%s~%s).csv", start, end)
+	//if start+end == "" {
+	//	name = "dump_email_script_(all).csv"
+	//}
+	//Write(name, scriptData)
 	log.Printf("name: %s, count: %d", name, sc)
 
 	if DEBUG {
@@ -284,6 +285,8 @@ func dumpEmail(host string, port string, user string, password string, dbName st
 	}
 	log.Printf("statistics time (%s~%s) total:%d, api:%d, script:%d, noDot:%d, dot:%d, repeat %d", start, end, total, ac, sc, noDotCount, dotCount, repeatCount)
 	log.Printf("dump used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
+
+	return name, len(apiData)
 }
 
 func stringSpilt(c rune) bool {
@@ -621,9 +624,9 @@ func GetEmailCount(mysql MysqlServer, finished int, start int64, end int64) int 
 		if finished != 0 {
 			sql += fmt.Sprintf(" AND update_time > %d AND update_time < %d", start, end)
 		}
-		if DEBUG {
-			log.Println(sql)
-		}
+		//if DEBUG {
+		//	log.Println(sql)
+		//}
 		rows, _ := db.Query(sql)
 		if nil == rows {
 			continue
@@ -917,7 +920,7 @@ func Dump() {
 	//GetEmailCount(config.mysql, 2, 1604246400,1604332800 )
 	//return
 
-	dump_email_simple(config.mysql, "2020-11-18", "2020-11-24")
+	DumpEmailSimple(config.mysql, "2020-11-18", "2020-11-24", -1)
 	return
 
 	args := os.Args
@@ -938,7 +941,7 @@ func Dump() {
 			args = append(args, "0")
 		}
 		DEBUG = args[9] == "1"
-		dumpEmail(args[2], args[3], args[4], args[5], args[6], args[7], args[8])
+		dumpEmail(args[2], args[3], args[4], args[5], args[6], args[7], args[8], -1)
 	} else if args[1] == "2" {
 		if len(args) == 9 {
 			args = append(args, "0")

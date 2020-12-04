@@ -155,6 +155,7 @@ func Main() {
 	http.HandleFunc("/buckets", Buckets)
 	http.HandleFunc("/key_count", KeyCount)
 	http.HandleFunc("/dump_email_zip", dumpEmailZip)
+	http.HandleFunc("/dump_email_ok_zip", dumpEmailOkZip)
 	http.HandleFunc("/import_email", importEmailData)
 	http.HandleFunc("/get_email_count", getEmailCount)
 
@@ -768,6 +769,37 @@ func dumpEmailZip(response http.ResponseWriter, request *http.Request) {
 	allData = nil
 	emailData = nil
 	departList = nil
+}
+
+func dumpEmailOkZip(response http.ResponseWriter, request *http.Request) {
+	query := request.URL.Query()
+	if nil == query["finished"] || nil == query["start"] || nil == query["end"] {
+		responseError(response, "finished start(2020-11-01) end(2020-11-01) must set")
+		return
+	}
+
+	finished, _ := strconv.ParseInt(query["finished"][0], 10, 64)
+	start := query["start"][0]
+	end := query["end"][0]
+
+	csvFile, emailCount := DumpEmailSimple(config.mysql, start, end, int(finished))
+	timePrefix := fmt.Sprintf("email_%d_(%s~%s)", finished, start, end)
+	compressZip := func() {
+		logger.Info("start compress file.")
+		zipFileName := fmt.Sprintf("%s(%d).tar.gz", timePrefix, emailCount)
+		os.Remove(zipFileName)
+
+		_csvFile, _ := os.Open(csvFile)
+		var csvFiles []*os.File
+		csvFiles = append(csvFiles, _csvFile)
+		util.Compress(csvFiles, zipFileName)
+
+		download(zipFileName, response)
+		os.Remove(csvFile)
+		os.Remove(zipFileName)
+	}
+
+	compressZip()
 }
 
 func importEmailData(response http.ResponseWriter, request *http.Request) {
