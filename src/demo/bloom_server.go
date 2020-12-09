@@ -655,6 +655,10 @@ func dumpEmailZip(response http.ResponseWriter, request *http.Request) {
 	if "" == status {
 		status = "1"
 	}
+	finished := getParams(request, "finished")
+	if "" == finished {
+		finished = "1"
+	}
 	depart := int64(3)
 	_depart := getParams(request, "depart")
 	if "" != _depart {
@@ -690,7 +694,7 @@ func dumpEmailZip(response http.ResponseWriter, request *http.Request) {
 	}
 
 	logger.Infof("start dump un valid email.")
-	allData, emailData := dumpUnValidEmailApi(config.mysql, status, limit)
+	allData, emailData := dumpUnValidEmailApi(config.mysql, status, finished, limit)
 	logger.Infof("finish dump un valid email.")
 
 	endPrefix := ""

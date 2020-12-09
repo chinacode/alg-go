@@ -435,11 +435,11 @@ func getEmailName(username string) []string {
 	return getEmailNames(letterList)
 }
 
-func dumpUnValidEmailApi(mysql MysqlServer, status string, limit string) ([][]string, [][]string) {
-	return dumpUnValidEmail(mysql.host, strconv.Itoa(mysql.port), mysql.user, mysql.password, mysql.database, status, limit, false)
+func dumpUnValidEmailApi(mysql MysqlServer, status string, finished string, limit string) ([][]string, [][]string) {
+	return dumpUnValidEmail(mysql.host, strconv.Itoa(mysql.port), mysql.user, mysql.password, mysql.database, status, finished, limit, false)
 }
 
-func dumpUnValidEmail(host string, port string, user string, password string, dbName string, status string, limit string, writeFile bool) ([][]string, [][]string) {
+func dumpUnValidEmail(host string, port string, user string, password string, dbName string, status string, finished string, limit string, writeFile bool) ([][]string, [][]string) {
 	bloomInstance, err = bloomfilter.NewOptimal(maxElements, probCollide)
 	startTime := time.Now().UnixNano()
 	log.Printf("dump start %s", time.Now().String())
@@ -481,7 +481,7 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 
 	discardList := make(map[int][]string)
 	for index := 0; index < 108; index++ {
-		sql := fmt.Sprintf("SELECT id,username FROM linkedin_usernames_%d WHERE finished = 1 AND email_name = '' AND update_time > 0 limit %s", index, limit)
+		sql := fmt.Sprintf("SELECT id,username FROM linkedin_usernames_%d WHERE finished = %s AND email_name = '' AND update_time > 0 limit %s", index, finished, limit)
 		if DEBUG {
 			log.Println(sql)
 		}
@@ -661,25 +661,56 @@ func GetEmailCount(mysql MysqlServer, finished int, start int64, end int64) int 
 }
 
 func bloomRequest(url string, emailList []string) []int8 {
-	response, _ := http.Post(url, "application/x-www-form-urlencoded", strings.NewReader(strings.Join(emailList, ",")))
-	jsonData, _ := ioutil.ReadAll(response.Body)
-	var checkData CheckData
-	err := json.Unmarshal(jsonData, &checkData)
-	if nil != err {
-		log.Printf("decode check json fail %s", err)
-	}
 	var checkList []int8
+	//use memory bloom
+	memoryBloomCheck := func(emailList []string) []int8 {
+		bucket = "email_ok"
+		bucketBloomFilter := bloomfilterMap[bucket]
 
-	if len(checkData.Data) <= 11 {
-		count, _ := strconv.ParseInt(checkData.Data, 10, 64)
-		checkList = append(checkList, int8(count))
+		for _, email := range emailList {
+			hash := fnv.New64()
+			hash.Write([]byte(email))
+			exists := bucketBloomFilter.Contains(hash)
+			if exists {
+				checkList = append(checkList, 1)
+			} else {
+				checkList = append(checkList, 0)
+			}
+			hash.Reset()
+		}
 		return checkList
 	}
 
-	err = json.Unmarshal([]byte(checkData.Data), &checkList)
-	if nil != err {
-		log.Printf("decode check json fail %s", err)
+	//remote checker
+	requestBloomCheck := func(url string, emailList []string) []int8 {
+		response, _ := http.Post(url, "application/x-www-form-urlencoded", strings.NewReader(strings.Join(emailList, ",")))
+		jsonData, _ := ioutil.ReadAll(response.Body)
+		var checkData CheckData
+		err := json.Unmarshal(jsonData, &checkData)
+		if nil != err {
+			log.Printf("decode check json fail %s", err)
+		}
+
+		if len(checkData.Data) <= 11 {
+			count, _ := strconv.ParseInt(checkData.Data, 10, 64)
+			checkList = append(checkList, int8(count))
+			return checkList
+		}
+
+		err = json.Unmarshal([]byte(checkData.Data), &checkList)
+		if nil != err {
+			log.Printf("decode check json fail %s", err)
+		}
+		return checkList
 	}
+
+	//add use url
+	if strings.Contains(url, "add") {
+		checkList = requestBloomCheck(url, emailList)
+	} else {
+		checkList = memoryBloomCheck(emailList)
+	}
+
 	return checkList
 }
 
@@ -953,7 +984,7 @@ func Dump() {
 		//println(isMixing("5a50a6162"))
 		//println(isMixing("411884187"))
 		//println(isMixing("a18b61117"))
-		dumpUnValidEmail(args[2], args[3], args[4], args[5], args[6], args[7], args[8], true)
+		dumpUnValidEmail(args[2], args[3], args[4], args[5], args[6], args[7], "1", args[8], true)
 	} else if args[1] == "3" {
 		if len(args) == 9 {
 			args = append(args, "0")
