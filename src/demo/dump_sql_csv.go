@@ -480,10 +480,14 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 	}
 
 	discardList := make(map[int][]string)
+	whereSql := " "
+	if finished != "0" {
+		whereSql = " AND update_time > 0"
+	}
 	for index := 0; index < 108; index++ {
-		sql := fmt.Sprintf("SELECT id,username FROM linkedin_usernames_%d WHERE finished = %s AND email_name = '' AND update_time > 0 limit %s", index, finished, limit)
+		sql := fmt.Sprintf("SELECT id,username FROM linkedin_usernames_%d WHERE finished = %s AND email_name = '' %s limit %s", index, finished, whereSql, limit)
 		if DEBUG {
-			log.Println(sql)
+			logger.Infof(sql)
 		}
 		rows, _ := db.Query(sql)
 		if nil == rows {
@@ -666,8 +670,13 @@ func bloomRequest(url string, emailList []string) []int8 {
 	memoryBloomCheck := func(emailList []string) []int8 {
 		bucket = "email_ok"
 		bucketBloomFilter := bloomfilterMap[bucket]
+		logger.Errorf("bloom filter is nil bucket is {}", bucket)
 
 		for _, email := range emailList {
+			if nil == bucketBloomFilter {
+				checkList = append(checkList, 0)
+				continue
+			}
 			hash := fnv.New64()
 			hash.Write([]byte(email))
 			exists := bucketBloomFilter.Contains(hash)
