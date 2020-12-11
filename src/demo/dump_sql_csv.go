@@ -402,7 +402,7 @@ func isMixing(username string) bool {
 	return percent || change >= 3
 }
 
-func getEmailName(username string) []string {
+func GetEmailName(username string) []string {
 	//log.Println(username)
 	var emails []string
 	if !isLetterAndNumber(username) || len(username) <= 3 {
@@ -500,7 +500,7 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 			if err != nil {
 				log.Fatalf("email prefix scan fail %s", err)
 			}
-			emailNames := getEmailName(username.username)
+			emailNames := GetEmailName(username.username)
 			if len(emailNames) <= 0 {
 				discardTableList = append(discardTableList, strconv.FormatInt(username.id, 10))
 				continue
@@ -987,9 +987,9 @@ func Dump() {
 			args = append(args, "0")
 		}
 		DEBUG = args[9] == "1"
-		//getEmailName("-0123456789+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
-		//getEmailName("владимир-конельский-144497158")
-		//getEmailName("4d-ageng-anom-1a975518b")
+		//GetEmailName("-0123456789+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+		//GetEmailName("владимир-конельский-144497158")
+		//GetEmailName("4d-ageng-anom-1a975518b")
 		//println(isMixing("5a50a6162"))
 		//println(isMixing("411884187"))
 		//println(isMixing("a18b61117"))
@@ -999,9 +999,9 @@ func Dump() {
 			args = append(args, "0")
 		}
 		DEBUG = args[9] == "1"
-		//getEmailName("-0123456789+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
-		//getEmailName("владимир-конельский-144497158")
-		//getEmailName("4d-ageng-anom-1a975518b")
+		//GetEmailName("-0123456789+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+		//GetEmailName("владимир-конельский-144497158")
+		//GetEmailName("4d-ageng-anom-1a975518b")
 		importEmail(args[2], args[3], args[4], args[5], args[6], args[7], args[8], false)
 		//println(isMixing("5a50a6162"))
 	} else {

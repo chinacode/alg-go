@@ -139,6 +139,7 @@ func initConfig() {
 func Main() {
 	runtime.GOMAXPROCS(2)
 	seelog.ReplaceLogger(logger)
+
 	defer seelog.Flush()
 	initConfig()
 
@@ -148,6 +149,7 @@ func Main() {
 	http.HandleFunc("/batch_add", BatchAdd)
 	http.HandleFunc("/exists", Exists)
 	http.HandleFunc("/batch_exists", BatchExists)
+	http.HandleFunc("/batch_email_prefix", BatchEmailPrefix)
 	http.HandleFunc("/clear", Clear)
 	http.HandleFunc("/save", Save)
 	http.HandleFunc("/load", Load)
@@ -309,8 +311,12 @@ func getErrorResult(msg string) *Result {
 	return &result
 }
 
-func getResult(data interface{}) *Result {
+func getResult(data interface{}, encode bool) *Result {
 	var result Result
+	if !encode {
+		result = Result{Code: http.StatusOK, Msg: "success", Data: data}
+		return &result
+	}
 	if reflect.TypeOf(data).Name() != "string" {
 		jsonData, _ := json.Marshal(data)
 		result = Result{Code: http.StatusOK, Msg: "success", Data: string(jsonData)}
@@ -320,8 +326,12 @@ func getResult(data interface{}) *Result {
 	return &result
 }
 
-func responseSuccess(response http.ResponseWriter, data interface{}) {
-	result := getResult(data)
+func responseSuccess(response http.ResponseWriter, data interface{}, encode ...bool) {
+	_encode := false
+	if len(encode) > 0 {
+		_encode = encode[0]
+	}
+	result := getResult(data, _encode)
 	json, err := json.Marshal(&result)
 	if nil != err {
 		logger.Error(err)
@@ -364,6 +374,12 @@ func initParams(response http.ResponseWriter, request *http.Request) (bool, map[
 	paramKey = "keys"
 	bodyData := ""
 	if nil != request.Body {
+		defer request.Body.Close()
+
+		//buffer := bytes.NewBuffer(make([]byte, 40960))
+		//io.Copy(buffer, request.Body)
+
+		logger.Infof("content length size %d", request.ContentLength)
 		bodyData, _ := ioutil.ReadAll(request.Body)
 		keys = string(bodyData)
 		params[paramKey] = true
@@ -415,6 +431,7 @@ func initParams(response http.ResponseWriter, request *http.Request) (bool, map[
 	if !strings.Contains(request.RequestURI, "config") &&
 		!strings.Contains(request.RequestURI, "buckets") &&
 		!strings.Contains(request.RequestURI, "dump") &&
+		!strings.Contains(request.RequestURI, "batch_email_prefix") &&
 		!strings.Contains(request.RequestURI, "import") {
 		if "" == bucket || len(bucket) <= 0 {
 			responseError(response, fmt.Sprintf("params bucket must set!"))
@@ -562,6 +579,36 @@ func BatchExists(response http.ResponseWriter, request *http.Request) {
 	}
 	hash.Reset()
 	responseSuccess(response, batchList)
+	list = nil
+	batchList = nil
+}
+
+func BatchEmailPrefix(response http.ResponseWriter, request *http.Request) {
+	check, params := initParams(response, request)
+	if !check {
+		return
+	}
+	if !params["keys"] {
+		responseError(response, fmt.Sprintf("keys must set!"))
+		return
+	}
+
+	var batchList []string
+	SPLIT = rune(',')
+	list := strings.Split(keys, ",")
+	for _, keyString := range list {
+		if len(keyString) <= 0 {
+			continue
+		}
+		emailNames := GetEmailName(keyString)
+		exists := len(emailNames) > 0
+		if exists {
+			batchList = append(batchList, strings.Join(emailNames, "#"))
+		} else {
+			batchList = append(batchList, "")
+		}
+	}
+	responseSuccess(response, batchList, false)
 	list = nil
 	batchList = nil
 }
