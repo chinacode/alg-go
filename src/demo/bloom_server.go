@@ -957,6 +957,10 @@ func getEmailCount(response http.ResponseWriter, request *http.Request) {
 		}
 	}
 
-	count := GetEmailCount(config.mysql, int(finished), _start.Unix(), _end.Unix())
-	responseSuccess(response, count)
+	usernameCount, emailCount := GetEmailCount(config.mysql, int(finished), _start.Unix(), _end.Unix())
+	data := map[string]int{
+		"name_count":  usernameCount,
+		"email_count": emailCount,
+	}
+	responseSuccess(response, data, true)
 }

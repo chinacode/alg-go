@@ -601,11 +601,12 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 	return allData, newEmailData
 }
 
-func GetEmailCount(mysql MysqlServer, finished int, start int64, end int64) int {
+func GetEmailCount(mysql MysqlServer, finished int, start int64, end int64) (int, int) {
 	startTime := time.Now().UnixNano()
 	log.Printf("dump start %s", time.Now().String())
 
-	count := 0
+	emailCount := 0
+	usernameCount := 0
 	dbUrl := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", mysql.user, mysql.password, mysql.host, mysql.port, mysql.database)
 	if DEBUG {
 		log.Println(dbUrl)
@@ -637,10 +638,7 @@ func GetEmailCount(mysql MysqlServer, finished int, start int64, end int64) int 
 		}
 
 		for rows.Next() {
-			if finished == 0 {
-				count++
-				continue
-			}
+			usernameCount++
 
 			var email Email
 			err := rows.Scan(&email.email_name, &email.email_prefix, &email.email_name2, &email.email_prefix2)
@@ -651,17 +649,17 @@ func GetEmailCount(mysql MysqlServer, finished int, start int64, end int64) int 
 			var prefixList []uint
 			if "" != email.email_prefix {
 				json.Unmarshal([]byte(email.email_prefix), &prefixList)
-				count += len(prefixList)
+				emailCount += len(prefixList)
 			}
 			if "" != email.email_prefix2.String {
 				json.Unmarshal([]byte(email.email_prefix2.String), &prefixList)
-				count += len(prefixList)
+				emailCount += len(prefixList)
 			}
 		}
 	}
 
 	log.Printf("dump used time %d ms", (time.Now().UnixNano()-startTime)/1000/1000)
-	return count
+	return usernameCount, emailCount
 }
 
 func bloomRequest(url string, emailList []string) []int8 {
