@@ -603,7 +603,7 @@ func BatchEmailPrefix(response http.ResponseWriter, request *http.Request) {
 		emailNames := GetEmailName(keyString)
 		exists := len(emailNames) > 0
 		if exists {
-			batchList = append(batchList, strings.Join(emailNames, "#"))
+			batchList = append(batchList, strings.Join(emailNames, ","))
 		} else {
 			batchList = append(batchList, "")
 		}
