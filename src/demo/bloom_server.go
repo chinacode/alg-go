@@ -311,9 +311,9 @@ func getErrorResult(msg string) *Result {
 	return &result
 }
 
-func getResult(data interface{}, encode bool) *Result {
+func getResult(data interface{}, unEncode bool) *Result {
 	var result Result
-	if !encode {
+	if unEncode {
 		result = Result{Code: http.StatusOK, Msg: "success", Data: data}
 		return &result
 	}
@@ -326,12 +326,12 @@ func getResult(data interface{}, encode bool) *Result {
 	return &result
 }
 
-func responseSuccess(response http.ResponseWriter, data interface{}, encode ...bool) {
-	_encode := false
-	if len(encode) > 0 {
-		_encode = encode[0]
+func responseSuccess(response http.ResponseWriter, data interface{}, unEncode ...bool) {
+	_UnEncode := false
+	if len(unEncode) > 0 {
+		_UnEncode = unEncode[0]
 	}
-	result := getResult(data, _encode)
+	result := getResult(data, _UnEncode)
 	json, err := json.Marshal(&result)
 	if nil != err {
 		logger.Error(err)
@@ -375,7 +375,6 @@ func initParams(response http.ResponseWriter, request *http.Request) (bool, map[
 	bodyData := ""
 	if nil != request.Body {
 		defer request.Body.Close()
-
 		//buffer := bytes.NewBuffer(make([]byte, 40960))
 		//io.Copy(buffer, request.Body)
 
@@ -608,7 +607,7 @@ func BatchEmailPrefix(response http.ResponseWriter, request *http.Request) {
 			batchList = append(batchList, "")
 		}
 	}
-	responseSuccess(response, batchList, false)
+	responseSuccess(response, batchList, true)
 	list = nil
 	batchList = nil
 }
