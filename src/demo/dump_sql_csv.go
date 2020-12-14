@@ -363,7 +363,9 @@ func getEmailNames(nameList []string) []string {
 	if len(nameList) == 2 {
 		return []string{strings.Join(nameList, ""), strings.Join(nameList, ".")}
 	}
-	nameList = nameList[:2]
+	if len(nameList) > 4 {
+		nameList = nameList[:4]
+	}
 	return []string{strings.Join(nameList, ""), strings.Join(nameList, ".")}
 }
 
@@ -423,7 +425,7 @@ func GetEmailName(username string) []string {
 	//delete too short string
 	var letterList []string
 	for _, string := range splitList {
-		if len(string) <= 2 || isMixing(string) || len(string) > 23 {
+		if len(string) <= 1 || isMixing(string) || len(string) > 23 {
 			continue
 		}
 		letterList = append(letterList, string)
