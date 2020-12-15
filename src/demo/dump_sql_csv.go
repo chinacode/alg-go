@@ -363,8 +363,8 @@ func getEmailNames(nameList []string) []string {
 	if len(nameList) == 2 {
 		return []string{strings.Join(nameList, ""), strings.Join(nameList, ".")}
 	}
-	if len(nameList) > 4 {
-		nameList = nameList[:4]
+	if len(nameList) > 3 {
+		nameList = nameList[:3]
 	}
 	return []string{strings.Join(nameList, ""), strings.Join(nameList, ".")}
 }
