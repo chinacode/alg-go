@@ -936,9 +936,18 @@ func getEmailCount(response http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	finished, _ := strconv.ParseInt(query["finished"][0], 10, 64)
+	gender := int64(0)
+	countryId := int64(0)
+	if nil != query["gender"] {
+		gender, _ = strconv.ParseInt(query["gender"][0], 10, 64)
+	}
+	if nil != query["countryId"] {
+		countryId, _ = strconv.ParseInt(query["countryId"][0], 10, 64)
+	}
+
 	start := query["start"][0]
 	end := query["end"][0]
+	finished, _ := strconv.ParseInt(query["finished"][0], 10, 64)
 
 	var _start time.Time
 	var _end time.Time
@@ -957,7 +966,7 @@ func getEmailCount(response http.ResponseWriter, request *http.Request) {
 		}
 	}
 
-	usernameCount, emailCount := GetEmailCount(config.mysql, int(finished), _start.Unix(), _end.Unix())
+	usernameCount, emailCount := GetEmailCount(config.mysql, int(finished), int(countryId), int(gender), _start.Unix(), _end.Unix())
 	data := map[string]int{
 		"name_count":  usernameCount,
 		"email_count": emailCount,

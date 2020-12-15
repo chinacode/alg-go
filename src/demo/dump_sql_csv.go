@@ -603,7 +603,7 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 	return allData, newEmailData
 }
 
-func GetEmailCount(mysql MysqlServer, finished int, start int64, end int64) (int, int) {
+func GetEmailCount(mysql MysqlServer, finished int, countryId int, gender int, start int64, end int64) (int, int) {
 	startTime := time.Now().UnixNano()
 	log.Printf("dump start %s", time.Now().String())
 
@@ -631,6 +631,13 @@ func GetEmailCount(mysql MysqlServer, finished int, start int64, end int64) (int
 		if finished != 0 {
 			sql += fmt.Sprintf(" AND update_time > %d AND update_time < %d", start, end)
 		}
+		if countryId > 0 {
+			sql += fmt.Sprintf(" AND country_id = %d", countryId)
+		}
+		if gender > 0 {
+			sql += fmt.Sprintf(" AND gender = %d", gender)
+		}
+
 		//if DEBUG {
 		//	log.Println(sql)
 		//}
