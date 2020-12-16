@@ -387,7 +387,7 @@ func getEmailNames(nameList []string, returnPart bool) []string {
 	return []string{strings.Join(nameList, ""), strings.Join(nameList, ".")}
 }
 
-func stringSum(username string) uint64 {
+func StringSum(username string) uint64 {
 	sum := uint64(0)
 	for _, v := range username {
 		sum += uint64(v)
