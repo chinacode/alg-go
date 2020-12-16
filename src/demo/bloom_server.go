@@ -599,7 +599,8 @@ func BatchEmailPrefix(response http.ResponseWriter, request *http.Request) {
 		if len(keyString) <= 0 {
 			continue
 		}
-		emailNames := GetEmailName(keyString)
+		//emailNames := GetEmailName(keyString, false)
+		emailNames := GetEmailEffectiveRankList(keyString)
 		exists := len(emailNames) > 0
 		if exists {
 			batchList = append(batchList, strings.Join(emailNames, ","))

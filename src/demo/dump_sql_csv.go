@@ -15,6 +15,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -117,6 +118,19 @@ func ReadCsv(filename string) [][]string {
 		lines = append(lines, record)
 	}
 	return lines
+}
+
+func getDB(mysql MysqlServer) *sql.DB {
+	dbUrl := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", mysql.user, mysql.password, mysql.host, mysql.port, mysql.database)
+	if DEBUG {
+		log.Println(dbUrl)
+	}
+	db, err := sql.Open("mysql", dbUrl)
+	if err != nil {
+		log.Fatalf("Could not connect to server: %s\n", err)
+	}
+	defer db.Close()
+	return db
 }
 
 func getPrefix(db *sql.DB) map[uint]EmailPrefix {
@@ -353,7 +367,14 @@ func countNumberLetter(username string) (int8, int8) {
 	return n, l
 }
 
-func getEmailNames(nameList []string) []string {
+func getEmailNames(nameList []string, returnPart bool) []string {
+	if len(nameList) > 3 {
+		nameList = nameList[:3]
+	}
+	//return username depart
+	if returnPart {
+		return nameList
+	}
 	if len(nameList) <= 0 {
 		return []string{}
 	}
@@ -362,9 +383,6 @@ func getEmailNames(nameList []string) []string {
 	}
 	if len(nameList) == 2 {
 		return []string{strings.Join(nameList, ""), strings.Join(nameList, ".")}
-	}
-	if len(nameList) > 3 {
-		nameList = nameList[:3]
 	}
 	return []string{strings.Join(nameList, ""), strings.Join(nameList, ".")}
 }
@@ -404,7 +422,24 @@ func isMixing(username string) bool {
 	return percent || change >= 3
 }
 
-func GetEmailName(username string) []string {
+func permute(nums []string) [][]string {
+	if len(nums) == 1 {
+		return [][]string{nums}
+	}
+	var ret [][]string
+	for i := 0; i < len(nums); i++ {
+		buf := make([]string, len(nums)-1)
+		copy(buf, nums[0:i])
+		copy(buf[i:], nums[i+1:])
+		r := permute(buf)
+		for _, v := range r {
+			ret = append(ret, append(v, nums[i]))
+		}
+	}
+	return ret
+}
+
+func GetEmailName(username string, returnPart bool) []string {
 	//log.Println(username)
 	var emails []string
 	if !isLetterAndNumber(username) || len(username) <= 3 {
@@ -416,7 +451,7 @@ func GetEmailName(username string) []string {
 		if len(splitList[0]) > 23 || len(splitList[0]) < 5 || isMixing(splitList[0]) {
 			return emails
 		}
-		return getEmailNames(splitList)
+		return getEmailNames(splitList, returnPart)
 	}
 	//delete last string random by linkedin
 	if len(splitList) >= 3 && containLetterAndNumber(splitList[len(splitList)-1]) {
@@ -430,11 +465,68 @@ func GetEmailName(username string) []string {
 		}
 		letterList = append(letterList, string)
 	}
+	lastPart := letterList[len(letterList)-1]
+	if isNumber(lastPart) && len(lastPart) > 5 {
+		letterList = letterList[:len(letterList)-1]
+	}
 	if len(letterList) <= 2 {
-		return getEmailNames(letterList)
+		return getEmailNames(letterList, returnPart)
 	}
 
-	return getEmailNames(letterList)
+	return getEmailNames(letterList, returnPart)
+}
+
+func GetEmailEffectiveRankList(username string) []string {
+	departs := GetEmailName(username, true)
+	if len(departs) <= 1 {
+		return departs
+	}
+
+	endPrefixList := []string{"gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "live.com"}
+	emailBucket := "email_ok"
+	emailOKBloomFilter := bloomfilterMap[emailBucket]
+	emailBucket = "email_fail"
+	emailFailBloomFilter := bloomfilterMap[emailBucket]
+	if nil == emailFailBloomFilter || nil == emailOKBloomFilter {
+		return getEmailNames(departs, false)
+	}
+
+	getNotExistsCount := func(emailPrefixList []string) int {
+		notExists := 0
+		for _, emailPrefix := range emailPrefixList {
+			for _, endPrefix := range endPrefixList {
+				email := emailPrefix + "@" + endPrefix
+				hash := fnv.New64()
+				hash.Write([]byte(email))
+				if !emailOKBloomFilter.Contains(hash) && !emailFailBloomFilter.Contains(hash) {
+					notExists++
+				}
+				hash.Reset()
+			}
+		}
+		return notExists
+	}
+
+	prefixMap := map[int][]string{}
+	possibilities := permute(departs)
+	for _, parts := range possibilities {
+		email := strings.Join(parts, "")
+		dotEmail := strings.Join(parts, ".")
+		count := getNotExistsCount([]string{email, dotEmail})
+		prefixMap[count] = parts
+	}
+
+	var keys []int
+	//if len(prefixMap) > 1 {
+	//	println(prefixMap)
+	//}
+	for key := range prefixMap {
+		keys = append(keys, key)
+	}
+	sort.Ints(keys)
+
+	selectParts := prefixMap[keys[len(keys)-1]]
+	return getEmailNames(selectParts, false)
 }
 
 func dumpUnValidEmailApi(mysql MysqlServer, status string, finished string, limit string) ([][]string, [][]string) {
@@ -502,7 +594,7 @@ func dumpUnValidEmail(host string, port string, user string, password string, db
 			if err != nil {
 				log.Fatalf("email prefix scan fail %s", err)
 			}
-			emailNames := GetEmailName(username.username)
+			emailNames := GetEmailName(username.username, false)
 			if len(emailNames) <= 0 {
 				discardTableList = append(discardTableList, strconv.FormatInt(username.id, 10))
 				continue
