@@ -465,6 +465,9 @@ func GetEmailName(username string, returnPart bool) []string {
 		}
 		letterList = append(letterList, string)
 	}
+	if len(letterList) < 2 {
+		return getEmailNames(letterList, returnPart)
+	}
 	lastPart := letterList[len(letterList)-1]
 	if isNumber(lastPart) && len(lastPart) > 5 {
 		letterList = letterList[:len(letterList)-1]

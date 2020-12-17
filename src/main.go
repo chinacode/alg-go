@@ -58,9 +58,9 @@ func main() {
 	//log.Println(strings.Join(list, ","))
 
 	//demo.Dump()
-	//demo.Main()
+	demo.Main()
 
-	println(demo.StringSum("johnmelendrez") % 108)
+	//println(demo.StringSum("johnmelendrez") % 108)
 
 	//demo.EmailTest()
 
