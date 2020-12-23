@@ -58,7 +58,8 @@ func main() {
 	//log.Println(strings.Join(list, ","))
 
 	//demo.Dump()
-	demo.Main()
+	//demo.Main()
+	demo.OssEmailEndPrefix()
 
 	//println(demo.StringSum("johnmelendrez") % 108)
 
