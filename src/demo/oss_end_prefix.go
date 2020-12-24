@@ -3,6 +3,7 @@ package demo
 import (
 	"bufio"
 	"fmt"
+	"github.com/shopspring/decimal"
 	"io"
 	"io/ioutil"
 	"os"
@@ -49,6 +50,7 @@ func OssEmailEndPrefix() map[string]int {
 		if filename[0] != 'x' {
 			continue
 		}
+		//println(filename)
 		defer fileOperate.Close()
 		br := bufio.NewReader(fileOperate)
 		for {
@@ -80,7 +82,7 @@ func OssEmailEndPrefix() map[string]int {
 	var keys []int
 	endPrefixMap := make(map[int]string)
 	for key, value := range endPrefix {
-		if value < 1000 {
+		if value < 100 {
 			jumpCount++
 			continue
 		}
@@ -100,12 +102,19 @@ func OssEmailEndPrefix() map[string]int {
 	sort.Ints(keys)
 
 	//endPrefix, _ = SortMap(endPrefix)
-	for _, valueKey := range keys {
+	for i := len(keys) - 1; i >= 0; i-- {
+		valueKey := keys[i]
 		value := valueKey / 100
+		//if value < 10000 {
+		//	continue
+		//}
 		key := endPrefixMap[valueKey]
-		percent := float64((value * 100) / total)
-		fmt.Printf("%s：%d，(%.2f)\n", key, value, percent)
+		percent := decimal.NewFromFloat(float64(value*100)).DivRound(decimal.NewFromFloat(float64(total)), 4)
+		newPercent, _ := percent.Float64()
+
+		fmt.Printf("%s：%d，(%.2f)\n", key, value, newPercent)
 	}
+
 	fmt.Printf("total count %d，jump count %d", total, jumpCount)
 	return endPrefix
 }
