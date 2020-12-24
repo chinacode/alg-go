@@ -78,7 +78,6 @@ func OssEmailEndPrefix() map[string]int {
 
 	jumpCount := 0
 	listI := 0
-	tmpValue := 0
 	var keys []int
 	endPrefixMap := make(map[int]string)
 	for key, value := range endPrefix {
@@ -88,14 +87,10 @@ func OssEmailEndPrefix() map[string]int {
 		}
 		newValueKey := value * 100
 		if _, ok := endPrefixMap[newValueKey]; ok {
-			tmpValue = newValueKey
-			newValueKey = newValueKey + 1
+			newValueKey = newValueKey + listI
 			listI++
 		}
 
-		if tmpValue != newValueKey {
-			listI = 0
-		}
 		endPrefixMap[newValueKey] = key
 		keys = append(keys, newValueKey)
 	}
