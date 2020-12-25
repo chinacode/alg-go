@@ -84,7 +84,7 @@ func OssEmailEndPrefix() map[string]int {
 			}
 			//sql
 			end := ""
-			if index == 0 {
+			if index == -1 {
 				end = strings.Split(lineStr, "@")[1]
 				end = strings.ToLower(strings.Split(end, "'")[0])
 			} else {
