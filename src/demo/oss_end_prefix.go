@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -36,19 +37,35 @@ func sortMapByValue(m map[string]int) PairList {
 }
 
 func OssEmailEndPrefix() map[string]int {
-	total := 0
-	args := os.Args
-	path := args[1]
 	endPrefix := make(map[string]int)
+	args := os.Args
+
+	if len(args) < 5 {
+		fmt.Sprintf("params: （path split index limit）")
+		return endPrefix
+	}
+	path := args[1]
+	split := args[2]
+	index, err := strconv.Atoi(args[3])
+	if nil != err {
+		fmt.Sprintf("index error %s", err)
+		return endPrefix
+	}
+	limit, err2 := strconv.Atoi(args[4])
+	if nil != err2 {
+		fmt.Sprintf("index error %s", err)
+		return endPrefix
+	}
+	total := 0
 	files, _ := ioutil.ReadDir(path)
 	for _, f := range files {
 		filename := f.Name()
+		if filename[0] != 'x' {
+			continue
+		}
 		fileOperate, err := os.Open(filename)
 		if err != nil {
 			fmt.Printf("Error: %s\n", err)
-		}
-		if filename[0] != 'x' {
-			continue
 		}
 		//println(filename)
 		defer fileOperate.Close()
@@ -65,8 +82,25 @@ func OssEmailEndPrefix() map[string]int {
 			if len(lineStr) <= 4 {
 				continue
 			}
-			end := strings.Split(lineStr, "@")[1]
-			end = strings.ToLower(strings.Split(end, "'")[0])
+			//sql
+			end := ""
+			if index == 0 {
+				end = strings.Split(lineStr, "@")[1]
+				end = strings.ToLower(strings.Split(end, "'")[0])
+			} else {
+				ends := strings.Split(lineStr, split)
+				if len(ends) < index+1 {
+					continue
+				}
+				end = ends[index]
+				if !strings.Contains(end, "@") {
+					continue
+				}
+				end = strings.ToLower(strings.Split(end, "@")[1])
+			}
+			if len(end) <= 0 {
+				continue
+			}
 			if _, ok := endPrefix[end]; ok {
 				endPrefix[end] = endPrefix[end] + 1
 			} else {
@@ -81,7 +115,7 @@ func OssEmailEndPrefix() map[string]int {
 	var keys []int
 	endPrefixMap := make(map[int]string)
 	for key, value := range endPrefix {
-		if value < 100 {
+		if value < limit {
 			jumpCount++
 			continue
 		}
