@@ -41,19 +41,19 @@ func OssEmailEndPrefix() map[string]int {
 	args := os.Args
 
 	if len(args) < 5 {
-		fmt.Sprintf("params: （path split index limit）")
+		fmt.Printf("params: （path split index limit）")
 		return endPrefix
 	}
 	path := args[1]
 	split := args[2]
 	index, err := strconv.Atoi(args[3])
 	if nil != err {
-		fmt.Sprintf("index error %s", err)
+		fmt.Printf("index error %s", err)
 		return endPrefix
 	}
 	limit, err2 := strconv.Atoi(args[4])
 	if nil != err2 {
-		fmt.Sprintf("index error %s", err)
+		fmt.Printf("index error %s", err)
 		return endPrefix
 	}
 	total := 0
